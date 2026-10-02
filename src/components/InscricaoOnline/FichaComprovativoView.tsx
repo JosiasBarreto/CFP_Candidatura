@@ -26,20 +26,12 @@ interface FichaComprovativoViewProps {
 }
 
 const CabecalhoOficialCfp: React.FC = () => (
-  <div className="flex flex-col items-center text-center mb-4 space-y-2">
-    <div className="flex items-center justify-between w-full max-w-2xl px-2">
-      <img
-        src="/assets/logos/IEFP__Logo_.svg"
-        alt="IEFP Logo"
-        className="h-9 sm:h-11 object-contain"
-      />
-      <img
-        src="/assets/logos/CFPSTP.svg"
-        alt="CFP-STP Logo"
-        className="h-12 sm:h-14 object-contain"
-      />
-      <div className="w-16 hidden sm:block" />
-    </div>
+  <div className="flex flex-col items-center text-center mb-3 space-y-1.5">
+    <img
+      src="/assets/logos/CFPSTP.svg"
+      alt="CFP-STP Logo"
+      className="h-10 sm:h-12 object-contain"
+    />
     <h3 className="font-serif text-base sm:text-lg font-bold tracking-wide text-[#1a8026] uppercase">
       CENTRO DE FORMAÇÃO PROFISSIONAL DE SÃO TOMÉ E PRÍNCIPE
     </h3>
@@ -47,43 +39,40 @@ const CabecalhoOficialCfp: React.FC = () => (
 );
 
 const RodapeOficialCfp: React.FC<{ pagina: '1/2' | '2/2' }> = ({ pagina }) => (
-  <div className="mt-8 pt-4">
-    <p className="font-serif text-sm font-bold text-slate-900 mb-3">{pagina}</p>
-    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-3 text-[10px] text-slate-600">
-      {/* 1. República Portuguesa */}
+  <div className="mt-6 pt-3">
+    <p className="font-serif text-xs font-bold text-slate-900 mb-2">Página {pagina}</p>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-2 text-[10px] text-slate-600">
+      {/* 1. Esquerda: República Portuguesa */}
       <div className="flex items-center gap-2">
         <img
           src="/assets/logos/Republica%20protuguesa.svg"
           alt="República Portuguesa Logo"
-          className="h-8 object-contain"
+          className="h-7 sm:h-8 object-contain"
         />
-        <div className="leading-tight">
-          <p className="font-bold text-slate-800 uppercase">República Portuguesa</p>
-          <p className="text-[9px] text-slate-500">Trabalho, Solidariedade e Segurança Social</p>
+        <div className="leading-tight hidden xs:block">
+          <p className="font-bold text-slate-800 uppercase text-[9px]">República Portuguesa</p>
+          <p className="text-[8px] text-slate-500">Trabalho, Solidariedade e Segurança Social</p>
         </div>
       </div>
 
-      {/* 2. Centro: CFP-STP */}
-      <div className="flex items-center gap-2 text-center leading-tight">
+      {/* 2. Centro: IEFP */}
+      <div className="flex flex-col items-center leading-tight">
         <img
-          src="/assets/logos/CFPSTP.svg"
-          alt="CFP-STP"
-          className="h-8 object-contain"
+          src="/assets/logos/IEFP__Logo_.svg"
+          alt="IEFP Logo"
+          className="h-7 sm:h-8 object-contain"
         />
-        <div>
-          <p className="font-bold text-[#1a8026]">CFP-STP</p>
-          <p className="text-[9px] font-semibold text-slate-700 uppercase">
-            R.D. São Tomé e Príncipe · Centro de Formação Profissional
-          </p>
-        </div>
+        <p className="text-[8px] font-medium text-slate-600 uppercase mt-0.5">
+          Instituto do Emprego e Formação Profissional
+        </p>
       </div>
 
-      {/* 3. Cooperação Portuguesa */}
-      <div className="flex items-center gap-2">
+      {/* 3. Direita: Cooperação Portuguesa */}
+      <div className="flex items-center gap-1.5">
         <img
           src="/assets/logos/cooperacao-prtuguesa.svg"
           alt="Cooperação Portuguesa Logo"
-          className="h-8 object-contain"
+          className="h-7 sm:h-8 object-contain"
         />
       </div>
     </div>

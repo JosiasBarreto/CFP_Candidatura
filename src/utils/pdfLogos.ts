@@ -1,5 +1,5 @@
 /**
- * Utilitário de Carregamento de Logos Oficiais em SVG para PDF e Interface Web
+ * Utilitário de Carregamento dos Logos Oficiais em SVG Coloridos para PDF e Web
  */
 
 export const LOGO_PATHS = {
@@ -10,8 +10,7 @@ export const LOGO_PATHS = {
 };
 
 /**
- * Converte um ficheiro SVG da pasta public/assets/logos para Data URL de alta resolução (PNG)
- * garantindo compatibilidade total com o jsPDF
+ * Converte um ficheiro SVG colorido da pasta public/assets/logos para Data URL PNG
  */
 const carregarLogoParaDataUrl = (
   path: string,
@@ -48,7 +47,8 @@ const carregarLogoParaDataUrl = (
       console.warn(`[pdfLogos] Não foi possível carregar o logo de ${path}`);
       resolve('');
     };
-    img.src = path;
+    // Adiciona timestamp para forçar recarregamento de novos logos sem cache antigo
+    img.src = `${path}?v=${Date.now()}`;
   });
 };
 
@@ -61,15 +61,15 @@ export interface LogosDataUrls {
 
 let logosCache: LogosDataUrls | null = null;
 
-export const obterLogosEmDataUrl = async (): Promise<LogosDataUrls> => {
-  if (logosCache) return logosCache;
+export const obterLogosEmDataUrl = async (forcarAtualizacao = false): Promise<LogosDataUrls> => {
+  if (logosCache && !forcarAtualizacao) return logosCache;
 
   try {
     const [cfpStp, iefp, republicaPortuguesa, cooperacaoPortuguesa] = await Promise.all([
-      carregarLogoParaDataUrl(LOGO_PATHS.cfpStp, 500, 500),
-      carregarLogoParaDataUrl(LOGO_PATHS.iefp, 600, 300),
-      carregarLogoParaDataUrl(LOGO_PATHS.republicaPortuguesa, 800, 500),
-      carregarLogoParaDataUrl(LOGO_PATHS.cooperacaoPortuguesa, 800, 300),
+      carregarLogoParaDataUrl(LOGO_PATHS.cfpStp, 400, 400),
+      carregarLogoParaDataUrl(LOGO_PATHS.iefp, 500, 250),
+      carregarLogoParaDataUrl(LOGO_PATHS.republicaPortuguesa, 600, 350),
+      carregarLogoParaDataUrl(LOGO_PATHS.cooperacaoPortuguesa, 600, 250),
     ]);
 
     logosCache = {
@@ -80,7 +80,7 @@ export const obterLogosEmDataUrl = async (): Promise<LogosDataUrls> => {
     };
     return logosCache;
   } catch (e) {
-    console.warn('[pdfLogos] Erro ao carregar logos em lote:', e);
+    console.warn('[pdfLogos] Erro ao carregar logos coloridos:', e);
     return {};
   }
 };
