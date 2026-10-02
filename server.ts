@@ -26,6 +26,14 @@ const flaskProxy = createProxyMiddleware({
   target: FLASK_BACKEND_URL,
   changeOrigin: true,
   ws: false,
+  pathRewrite: (path: string) => {
+    // Mapeamento automático de rotas
+    if (path === '/api/programas') return '/programa';
+    if (path === '/api/cursos') return '/curso/busca';
+    if (path === '/api/status') return '/status';
+    if (path.startsWith('/api/')) return path.replace(/^\/api/, '');
+    return path;
+  },
   onError: (err: Error, _req: any, res: any) => {
     console.error(`[CFP-STP Proxy] Erro de ligação com Flask (${FLASK_BACKEND_URL}):`, err.message);
     if (res && typeof res.status === 'function' && !res.headersSent) {
@@ -51,13 +59,16 @@ const flaskProxy = createProxyMiddleware({
 } as any);
 
 // Todas as rotas da API são direcionadas para a API Flask
-app.use('/api', flaskProxy);
+app.use('/status', flaskProxy);
+app.use('/programa', flaskProxy);
+app.use('/programas', flaskProxy);
 app.use('/curso', flaskProxy);
 app.use('/cursos', flaskProxy);
-app.use('/programas', flaskProxy);
+app.use('/candidatura', flaskProxy);
 app.use('/candidaturas', flaskProxy);
 app.use('/nivel-acesso', flaskProxy);
 app.use('/niveis-acesso', flaskProxy);
+app.use('/api', flaskProxy);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

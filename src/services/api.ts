@@ -44,17 +44,76 @@ apiClient.interceptors.response.use(
   }
 );
 
+/**
+  * Verificação de conectividade simples com o endpoint /status da API Flask (192.168.100.141:5000)
+  */
+export interface ResultadoStatusBackend {
+  statusOk: boolean;
+  mensagem: string;
+  detalhes?: any;
+}
+
+export const verificarConexaoBackend = async (): Promise<ResultadoStatusBackend> => {
+  const BACKEND_URL_DIRECTA = 'http://192.168.100.141:5000';
+  
+  // 1. Tenta direct fetch a http://192.168.100.141:5000/status
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(`${BACKEND_URL_DIRECTA}/status`, {
+      method: 'GET',
+      signal: controller.signal,
+    }).catch(() => null);
+    clearTimeout(timer);
+
+    if (res && res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return {
+        statusOk: true,
+        mensagem: 'Backend Flask conectado com sucesso em 192.168.100.141:5000.',
+        detalhes: data,
+      };
+    }
+  } catch (_e) {
+    // Ignora erro de rede direto e tenta via proxy
+  }
+
+  // 2. Tenta via proxy /status ou /api/status
+  try {
+    const resProxy = await apiClient.get('/status').catch(() => null);
+    if (resProxy && resProxy.status < 500) {
+      return {
+        statusOk: true,
+        mensagem: 'Backend Flask operacional via proxy.',
+        detalhes: resProxy.data,
+      };
+    }
+  } catch (_e) {
+    // Falha
+  }
+
+  return {
+    statusOk: false,
+    mensagem: `Aviso: O backend Flask (http://192.168.100.141:5000/status) está inacessível. Certifique-se de que a API Flask está a rodar na porta 5000.`,
+  };
+};
+
 // =============================================================================
 // SERVIÇOS DE PROGRAMAS DE FORMAÇÃO
 // =============================================================================
 export const programasService = {
   /**
    * Obtém a lista de programas de formação ativos no CFP-STP
+   * Tenta primeiro /programa (endpoint oficial Flask) e depois /programas
    */
   async listar(): Promise<ProgramaPublico[]> {
     try {
-      const response = await apiClient.get<any>('/programas');
-      const data = response.data;
+      // Endpoint oficial confirmado: GET http://192.168.100.141:5000/programa
+      let response = await apiClient.get<any>('/programa').catch(() => null);
+      if (!response || !response.data) {
+        response = await apiClient.get<any>('/programas');
+      }
+      const data = response?.data;
       if (Array.isArray(data)) return data;
       if (data && Array.isArray(data.programas)) return data.programas;
       if (data && Array.isArray(data.data)) return data.data;
@@ -72,13 +131,25 @@ export const programasService = {
 // =============================================================================
 export const cursosService = {
   /**
-   * Lista todos os cursos disponíveis ou filtra por programa
+   * Lista todos os cursos disponíveis
+   * Tenta primeiro POST /curso/busca (endpoint oficial Flask com HTTP 200 OK) e depois GET /cursos
    */
   async listar(programaId?: number): Promise<CursoPublico[]> {
     try {
-      const params = programaId ? { programa_id: programaId } : {};
-      const response = await apiClient.get<any>('/cursos', { params });
-      const data = response.data;
+      // Endpoint oficial confirmado: POST http://192.168.100.141:5000/curso/busca
+      let response = await apiClient
+        .post<any>('/curso/busca', {
+          ...(programaId ? { programa_id: programaId } : {}),
+          ano_execucao: 2026,
+        })
+        .catch(() => null);
+
+      if (!response || !response.data) {
+        const params = programaId ? { programa_id: programaId } : {};
+        response = await apiClient.get<any>('/cursos', { params }).catch(() => null);
+      }
+
+      const data = response?.data;
       if (Array.isArray(data)) return data;
       if (data && Array.isArray(data.cursos)) return data.cursos;
       if (data && Array.isArray(data.data)) return data.data;
@@ -95,7 +166,7 @@ export const cursosService = {
    */
   async buscarPorAno(ano?: number): Promise<CursoPublico[]> {
     try {
-      const response = await apiClient.post<any>('/curso/busca', ano ? { ano_execucao: ano } : {});
+      const response = await apiClient.post<any>('/curso/busca', { ano_execucao: ano || 2026 });
       const data = response.data;
       if (Array.isArray(data)) return data;
       if (data && Array.isArray(data.cursos)) return data.cursos;

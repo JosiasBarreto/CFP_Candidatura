@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Search,
@@ -13,6 +13,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  RefreshCw,
   GraduationCap,
   ShieldCheck,
   Phone,
@@ -20,6 +22,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { ModuloCandidatoApp, ModuloCandidatoAba } from './packages/modulo-candidato';
+import { verificarConexaoBackend } from './services/api';
 
 export default function App() {
   const [abaAtiva, setAbaAtiva] = useState<ModuloCandidatoAba>('candidatura_publica');
@@ -28,6 +31,28 @@ export default function App() {
     tipo: 'sucesso' | 'erro';
     texto: string;
   } | null>(null);
+
+  const [statusBackend, setStatusBackend] = useState<{
+    verificado: boolean;
+    conectado: boolean;
+    mensagem: string;
+    testando: boolean;
+  }>({ verificado: false, conectado: true, mensagem: '', testando: false });
+
+  const testarConexaoBackend = async () => {
+    setStatusBackend((prev) => ({ ...prev, testando: true }));
+    const resultado = await verificarConexaoBackend();
+    setStatusBackend({
+      verificado: true,
+      conectado: resultado.statusOk,
+      mensagem: resultado.mensagem,
+      testando: false,
+    });
+  };
+
+  useEffect(() => {
+    testarConexaoBackend();
+  }, []);
 
   const navegarPara = (novaAba: ModuloCandidatoAba) => {
     setAbaAtiva(novaAba);
@@ -214,6 +239,30 @@ export default function App() {
           </div>
         )}
       </header>
+
+      {/* Banner de Verificação do Backend Flask (/status) */}
+      {!statusBackend.conectado && statusBackend.verificado && (
+        <div className="no-print bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">
+          <div className="max-w-[1840px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-bold">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-slate-950 shrink-0" />
+              <span>
+                {statusBackend.mensagem ||
+                  'Aviso: O backend Flask (http://192.168.100.141:5000/status) está inacessível. Certifique-se de que a sua aplicação Flask está em execução na porta 5000.'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={testarConexaoBackend}
+              disabled={statusBackend.testando}
+              className="px-3.5 py-1.5 rounded-lg bg-slate-950 text-white hover:bg-slate-900 transition-colors text-[11px] font-bold shrink-0 cursor-pointer flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${statusBackend.testando ? 'animate-spin' : ''}`} />
+              {statusBackend.testando ? 'A testar /status...' : 'Tentar Novamente (Ping /status)'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Alerta Global de Notificação */}
       {feedbackMsg && (
