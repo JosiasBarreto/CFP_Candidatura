@@ -14,7 +14,7 @@ import {
   Camera,
   FileText,
   ShieldCheck,
-  FileSpreadsheet,
+  FileSpreadsheet, X, Image as ImageIcon,
 } from 'lucide-react';
 import { ProgramaPublico, CursoPublico, CandidaturaPublica } from '../types';
 import { candidatoApi } from '../services/candidatoApi';
@@ -1248,50 +1248,82 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-              {/* Fotografia - OBRIGATÓRIA */}
+              {/* Fotografia - OBRIGATÓRIA (Opção de Carregar do Dispositivo ou Tirar Foto) */}
               <div
                 id="campo-foto"
-                className={`border-2 rounded-xl p-4 space-y-2 transition-all ${
+                className={`border-2 rounded-xl p-4 space-y-3 transition-all ${
                   fieldHasError('foto')
                     ? 'border-rose-500 bg-rose-50/90 text-rose-950'
-                    : 'border-dashed border-emerald-400 bg-emerald-50/30'
+                    : 'border-emerald-300 bg-emerald-50/30'
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div>
                     <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
                       <span>Fotografia Tipo Passe *</span>
                       <FieldTooltip
                         title="Foto Oficial Obrigatória"
-                        content="Foto frontal recente com fundo claro. É estritamente obrigatória para emissão da Ficha de Inscrição."
+                        content="Pode carregar uma foto guardada no seu dispositivo ou tirar uma nova foto com a câmara."
                       />
                     </label>
-                    <p className="text-[11px] text-slate-500">Impressa na Página 1 do PDF</p>
+                    <p className="text-[11px] text-slate-500">Impressa na Página 1 da Ficha PDF</p>
                   </div>
                   {fotoPreview && (
-                    <img
-                      src={fotoPreview}
-                      alt="Foto 3x4"
-                      className="w-10 h-12 object-cover rounded border border-emerald-400"
-                    />
+                    <div className="relative group shrink-0">
+                      <img
+                        src={fotoPreview}
+                        alt="Foto Passe"
+                        className="w-12 h-14 object-cover rounded-lg border-2 border-emerald-600 shadow-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFileFoto(null);
+                          setFotoPreview('');
+                        }}
+                        className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
+                        title="Remover fotografia"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   )}
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    handleFotoUpload(e.target.files ? e.target.files[0] : null)
-                  }
-                  className="text-xs w-full text-slate-600"
-                />
-                <button
-                  type="button"
-                  onClick={() => setCameraAberta(true)}
-                  className="w-full py-1.5 px-3 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  Tirar Foto com a Câmara
-                </button>
+
+                {/* Duas Opções Claras e Destacadas */}
+                <div className="grid grid-cols-1 gap-2 pt-1">
+                  {/* Opção A: Carregar Foto do Dispositivo */}
+                  <label className="w-full py-2 px-3 rounded-lg bg-white border border-slate-300 hover:border-emerald-600 text-slate-800 hover:text-emerald-950 text-xs font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                    <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Carregar Foto do Dispositivo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        handleFotoUpload(e.target.files ? e.target.files[0] : null)
+                      }
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Opção B: Tirar Foto com a Câmara */}
+                  <button
+                    type="button"
+                    onClick={() => setCameraAberta(true)}
+                    className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs"
+                  >
+                    <Camera className="w-4 h-4 text-white shrink-0" />
+                    <span>Tirar Foto com a Câmara</span>
+                  </button>
+                </div>
+
+                {fileFoto && (
+                  <p className="text-[11px] text-emerald-800 font-medium truncate flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{fileFoto.name}</span>
+                  </p>
+                )}
+
                 {fieldHasError('foto') && (
                   <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
