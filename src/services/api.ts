@@ -6,10 +6,13 @@ import { exportarInscricaoParaExcel } from '../utils/pdfFichaGenerator';
 
 /**
  * Instância Centralizada do Axios para o CFP-STP
- * Configurada com a URL base da API (/api por padrão ou variável de ambiente)
+ * Configurada para se ligar diretamente à API Flask em http://192.168.100.141:5000
  */
+const FLASK_BACKEND_DEFAULT = 'http://192.168.100.141:5000';
+
 const BASE_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || '/api';
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) ||
+  FLASK_BACKEND_DEFAULT;
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -104,14 +107,13 @@ export const verificarConexaoBackend = async (): Promise<ResultadoStatusBackend>
 export const programasService = {
   /**
    * Obtém a lista de programas de formação ativos no CFP-STP
-   * Tenta primeiro /programa (endpoint oficial Flask) e depois /programas
+   * Conforme Manual: GET http://192.168.100.141:5000/programas
    */
   async listar(): Promise<ProgramaPublico[]> {
     try {
-      // Endpoint oficial confirmado: GET http://192.168.100.141:5000/programa
-      let response = await apiClient.get<any>('/programa').catch(() => null);
+      let response = await apiClient.get<any>('/programas').catch(() => null);
       if (!response || !response.data) {
-        response = await apiClient.get<any>('/programas');
+        response = await apiClient.get<any>('/programa').catch(() => null);
       }
       const data = response?.data;
       if (Array.isArray(data)) return data;
@@ -132,21 +134,20 @@ export const programasService = {
 export const cursosService = {
   /**
    * Lista todos os cursos disponíveis
-   * Tenta primeiro POST /curso/busca (endpoint oficial Flask com HTTP 200 OK) e depois GET /cursos
+   * Conforme Manual: GET http://192.168.100.141:5000/cursos (opcional ?programa_id={id})
    */
   async listar(programaId?: number): Promise<CursoPublico[]> {
     try {
-      // Endpoint oficial confirmado: POST http://192.168.100.141:5000/curso/busca
-      let response = await apiClient
-        .post<any>('/curso/busca', {
-          ...(programaId ? { programa_id: programaId } : {}),
-          ano_execucao: 2026,
-        })
-        .catch(() => null);
+      const params = programaId ? { programa_id: programaId } : {};
+      let response = await apiClient.get<any>('/cursos', { params }).catch(() => null);
 
       if (!response || !response.data) {
-        const params = programaId ? { programa_id: programaId } : {};
-        response = await apiClient.get<any>('/cursos', { params }).catch(() => null);
+        response = await apiClient
+          .post<any>('/curso/busca', {
+            ...(programaId ? { programa_id: programaId } : {}),
+            ano_execucao: 2026,
+          })
+          .catch(() => null);
       }
 
       const data = response?.data;
