@@ -4,27 +4,41 @@ import { createServer as createViteServer } from 'vite';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const app = express();
-const PORT = 3000;
 
-// URL da API Flask do Utilizador (127.0.0.1:5000 / 192.168.100.141:5000)
+// Porta do Frontend: Prioritiza PORT / FRONTEND_PORT ou assume 3002 por padrão
+const DEFAULT_PORT = 3002;
+const PORT = process.env.PORT
+  ? parseInt(process.env.PORT, 10)
+  : process.env.FRONTEND_PORT
+  ? parseInt(process.env.FRONTEND_PORT, 10)
+  : DEFAULT_PORT;
+
+// URL da API Flask do Utilizador (Padrão: localhost:5000 ou IP de rede local)
 const FLASK_BACKEND_URL =
   process.env.FLASK_BACKEND_URL ||
   process.env.BACKEND_URL ||
-  'http://127.0.0.1:5000';
+  'http://localhost:5000';
 
-console.log(`[CFP-STP Proxy] Encaminhando todas as requisições para a API Flask em: ${FLASK_BACKEND_URL}`);
+console.log(`[CFP-STP Proxy] A encaminhar requisições para a API Flask em: ${FLASK_BACKEND_URL}`);
 
 // Proxy reverso para a API Flask oficial
 const flaskProxy = createProxyMiddleware({
   target: FLASK_BACKEND_URL,
   changeOrigin: true,
   ws: false,
+  onError: (err: Error, _req: any, res: any) => {
+    console.error(`[CFP-STP Proxy] Erro de ligação com Flask (${FLASK_BACKEND_URL}):`, err.message);
+    if (res && typeof res.status === 'function' && !res.headersSent) {
+      res.status(502).json({
+        sucesso: false,
+        erro: `Não foi possível ligar ao servidor Flask em ${FLASK_BACKEND_URL}. Certifique-se de que a sua aplicação Flask está em execução na porta 5000.`,
+        detalhe: err.message,
+      });
+    }
+  },
   on: {
     error: (err: Error, _req: any, res: any) => {
-      console.error(
-        `[CFP-STP Proxy] Erro de comunicação com o Flask (${FLASK_BACKEND_URL}):`,
-        err.message
-      );
+      console.error(`[CFP-STP Proxy] Erro de ligação com Flask (${FLASK_BACKEND_URL}):`, err.message);
       if (res && typeof res.status === 'function' && !res.headersSent) {
         res.status(502).json({
           sucesso: false,
@@ -34,9 +48,9 @@ const flaskProxy = createProxyMiddleware({
       }
     },
   },
-});
+} as any);
 
-// Todas as requisições de API são direcionadas diretamente à API Flask
+// Todas as rotas da API são direcionadas para a API Flask
 app.use('/api', flaskProxy);
 app.use('/curso', flaskProxy);
 app.use('/cursos', flaskProxy);
@@ -60,9 +74,23 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[CFP-STP] Portal do Candidato online em http://localhost:${PORT}`);
-    console.log(`[CFP-STP] Backend Flask conectado em ${FLASK_BACKEND_URL}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[CFP-STP] Servidor Frontend ativo na porta ${PORT}`);
+    console.log(`[CFP-STP] Aceda no seu navegador em: http://localhost:${PORT}`);
+    console.log(`[CFP-STP] API Flask conectada em: ${FLASK_BACKEND_URL}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const altPort = PORT + 1;
+      console.warn(`[CFP-STP] A porta ${PORT} está em uso. A tentar na porta alternativa ${altPort}...`);
+      app.listen(altPort, '0.0.0.0', () => {
+        console.log(`[CFP-STP] Servidor Frontend ativo na porta alternativa ${altPort}`);
+        console.log(`[CFP-STP] Aceda no seu navegador em: http://localhost:${altPort}`);
+      });
+    } else {
+      console.error('[CFP-STP] Erro no servidor Express:', err);
+    }
   });
 }
 
