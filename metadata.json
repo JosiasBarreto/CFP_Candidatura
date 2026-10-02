@@ -1,0 +1,10 @@
+{
+  "name": "candidatura Online 2027",
+  "description": "Pagina de inscrição para um evento com campos para nome, email e preferências de contato.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

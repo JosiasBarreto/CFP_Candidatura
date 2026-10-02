@@ -1,0 +1,7 @@
+{
+  "name": "@cfp-stp/modulo-candidato",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pacote Independente do Módulo Público do Candidato CFP-STP (Submissão Livre sem Login, Emissão de Ficha Oficial PDF 2 Páginas, Consulta de Estado e Correção de Candidatura Devolvida)",
+  "main": "index.tsx"
+}
