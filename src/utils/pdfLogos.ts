@@ -69,7 +69,7 @@ export const obterLogosEmDataUrl = async (forcarAtualizacao = false): Promise<Lo
       carregarLogoParaDataUrl(LOGO_PATHS.cfpStp, 400, 400),
       carregarLogoParaDataUrl(LOGO_PATHS.iefp, 500, 250),
       carregarLogoParaDataUrl(LOGO_PATHS.republicaPortuguesa, 600, 350),
-      carregarLogoParaDataUrl(LOGO_PATHS.cooperacaoPortuguesa, 600, 250),
+      carregarLogoParaDataUrl(LOGO_PATHS.cooperacaoPortuguesa, 300, 250),
     ]);
 
     logosCache = {

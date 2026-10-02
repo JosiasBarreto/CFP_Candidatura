@@ -164,18 +164,13 @@ export const gerarPdfFormularioInscricao = async (
   // Esquerda: República Portuguesa | Centro: IEFP | Direita: Cooperação Portuguesa
   const drawOfficialFooter = (paginaTexto: '1/2' | '2/2') => {
     const footerLineY = 265;
-
-    // Linha divisória fina de segurança acima do rodapé
-    doc.setDrawColor(210, 214, 220);
-    doc.setLineWidth(0.25);
-    doc.line(marginL, footerLineY, rightEdge, footerLineY);
-
-    // Indicador de Página (acima da linha do rodapé)
+  
+    // Indicador de Página
     doc.setFont('times', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(50, 60, 75);
     doc.text(`Página ${paginaTexto}`, marginL, footerLineY - 1.5);
-
+  
     const logoY = footerLineY + 2.5;
 
     // 1. ESQUERDA: República Portuguesa (Republica protuguesa.svg)
@@ -185,20 +180,9 @@ export const gerarPdfFormularioInscricao = async (
       } catch (_e) {
         // Fallback
       }
-    } else {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.5);
-      doc.setTextColor(30, 41, 59);
-      doc.text('REPÚBLICA PORTUGUESA', marginL, logoY + 4);
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(4.2);
-    doc.setTextColor(30, 41, 59);
-    doc.text('REPÚBLICA PORTUGUESA', marginL + 23, logoY + 3.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(3.2);
-    doc.setTextColor(100, 116, 139);
-    doc.text('TRABALHO, SOLIDARIEDADE E SEGURANÇA SOCIAL', marginL + 23, logoY + 6.5);
+    } 
+    
+    
 
     // 2. CENTRO: IEFP (IEFP__Logo_.svg)
     const midX = 105;
@@ -208,33 +192,29 @@ export const gerarPdfFormularioInscricao = async (
       } catch (_e) {
         // Fallback
       }
-    } else {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5);
-      doc.setTextColor(15, 23, 42);
-      doc.text('IEFP', midX, logoY + 4, { align: 'center' });
-    }
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(3.3);
-    doc.setTextColor(80, 90, 105);
-    doc.text('INSTITUTO DO EMPREGO E FORMAÇÃO PROFISSIONAL', midX, logoY + 11, {
-      align: 'center',
-    });
+    } 
+    
 
     // 3. DIREITA: Cooperação Portuguesa (cooperacao-prtuguesa.svg)
-    const rightLogoX = rightEdge - 24;
-    if (logos.cooperacaoPortuguesa) {
-      try {
-        doc.addImage(logos.cooperacaoPortuguesa, 'PNG', rightLogoX, logoY, 24, 8.5);
-      } catch (_e) {
-        // Fallback
-      }
-    } else {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.5);
-      doc.setTextColor(71, 85, 105);
-      doc.text('COOPERAÇÃO PORTUGAL', rightLogoX, logoY + 4);
-    }
+    const cooperacaoLogoW = 18;
+const cooperacaoLogoH = 6.5;
+
+const rightLogoX = rightEdge - cooperacaoLogoW;
+
+if (logos.cooperacaoPortuguesa) {
+  try {
+    doc.addImage(
+      logos.cooperacaoPortuguesa,
+      'PNG',
+      rightLogoX,
+      logoY + 1,
+      cooperacaoLogoW,
+      cooperacaoLogoH
+    );
+  } catch (_e) {
+    // Fallback
+  }
+}
   };
 
   // Helper para desenhar a linha pautada e o valor preenchido (PESO REGULAR)
@@ -261,7 +241,7 @@ export const gerarPdfFormularioInscricao = async (
     if (value && value.trim()) {
       // DADOS PREENCHIDOS = PESO REGULAR
       doc.setFont('times', options?.bold ? 'bold' : 'normal');
-      doc.setFontSize(options?.fontSize || 9);
+      doc.setFontSize(options?.fontSize || 11);
       doc.setTextColor(tr, tg, tb);
       const maxW = Math.max(6, xEnd - xStart - 2);
       const textoCortado = doc.splitTextToSize(value.trim(), maxW)[0] || '';
@@ -399,7 +379,7 @@ export const gerarPdfFormularioInscricao = async (
   doc.setTextColor(greenR, greenG, greenB);
   doc.text('1 - Identificação do Candidato:', marginL, y);
 
-  const lineStep = 5.2; // Espaçamento compacto reduzido para caber tudo folgadamente
+  const lineStep = 8.7; // Espaçamento compacto reduzido para caber tudo folgadamente
   y = 73;
 
   // Nome:
@@ -432,22 +412,48 @@ export const gerarPdfFormularioInscricao = async (
   y += lineStep;
   const dn = extrairPartesData(dados.datanascimento);
   lx = drawLabel('Data de Nascimento', marginL, y, 9);
-  drawUnderlinedValue(lx, lx + 9, y + 0.3, dn.dia, { align: 'center' });
+
+  drawUnderlinedValue(
+    lx,
+    lx + 9,
+    y + 0.3,
+    dn.dia,
+    { align: 'center' }
+  );
+  
   doc.text('/', lx + 9.5, y);
-  drawUnderlinedValue(lx + 11, lx + 20, y + 0.3, dn.mes, { align: 'center' });
+  
+  drawUnderlinedValue(
+    lx + 11,
+    lx + 20,
+    y + 0.3,
+    dn.mes,
+    { align: 'center' }
+  );
+  
   doc.text('/', lx + 20.5, y);
-  drawUnderlinedValue(lx + 22, lx + 31, y + 0.3, dn.ano, { align: 'center' });
+  
+  // ANO — aumentar largura
+  drawUnderlinedValue(
+    lx + 22,
+    lx + 37,
+    y + 0.3,
+    dn.ano,
+    {
+      align: 'center',
+      fontSize: 9,
+    }
+  );
 
   lx = drawLabel('Sexo', lx + 34, y, 9);
-  drawUnderlinedValue(lx, lx + 28, y + 0.3, dados.sexo, { align: 'center' });
+  drawUnderlinedValue(lx, lx + 28, y + 0.3, dados.sexo);
 
   lx = drawLabel('Idade', lx + 30, y, 9);
   drawUnderlinedValue(
     lx,
     rightEdge,
     y + 0.3,
-    dados.idade ? `${dados.idade} anos` : '',
-    { align: 'center' }
+    dados.idade ? `${dados.idade} anos` : ''
   );
 
   // Nacionalidade: _____ Local de Nascimento _____
@@ -514,7 +520,7 @@ export const gerarPdfFormularioInscricao = async (
     let curY = yFirstLine;
     for (let i = 0; i < numLines; i++) {
       drawUnderlinedValue(marginL, rightEdge, curY, linhasTexto[i] || '');
-      curY += 5.2;
+      curY += 6;
     }
     return curY;
   };
@@ -543,7 +549,7 @@ export const gerarPdfFormularioInscricao = async (
     marginL + 44,
     y
   );
-  y = drawRuledParagraph(y + 5.5, 2, dados.experiencia_profissional);
+  y = drawRuledParagraph(y + 5.5, 3, dados.experiencia_profissional);
 
   // 5- Motivo da Inscrição no Centro de Formação: (2 linhas)
   y += 3.5;

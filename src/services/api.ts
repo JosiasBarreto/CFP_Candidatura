@@ -56,49 +56,18 @@ export interface ResultadoStatusBackend {
   detalhes?: any;
 }
 
-export const verificarConexaoBackend = async (): Promise<ResultadoStatusBackend> => {
-  const BACKEND_URL_DIRECTA = 'http://192.168.100.141:5000';
+export const verificarConexaoBackend = async ():  Promise<ResultadoStatusBackend> => {
+  try {
+    const response = await apiClient.get('/status');
+    if (response.status === 200 && response.data?.status === 'ok') {
+      return { statusOk: true, mensagem: 'Conexão com o backend estabelecida com sucesso.' };
+    } else {
+      return { statusOk: false, mensagem: 'O backend respondeu, mas não retornou status "ok".', detalhes: response.data };
+    }
+  } catch (error: any) {
+    return { statusOk: false, mensagem: 'Falha ao conectar com o backend.', detalhes: error.message || error };
+  }
   
-  // 1. Tenta direct fetch a http://192.168.100.141:5000/status
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(`${BACKEND_URL_DIRECTA}/status`, {
-      method: 'GET',
-      signal: controller.signal,
-    }).catch(() => null);
-    clearTimeout(timer);
-
-    if (res && res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return {
-        statusOk: true,
-        mensagem: 'Backend Flask conectado com sucesso em 192.168.100.141:5000.',
-        detalhes: data,
-      };
-    }
-  } catch (_e) {
-    // Ignora erro de rede direto e tenta via proxy
-  }
-
-  // 2. Tenta via proxy /status ou /api/status
-  try {
-    const resProxy = await apiClient.get('/status').catch(() => null);
-    if (resProxy && resProxy.status < 500) {
-      return {
-        statusOk: true,
-        mensagem: 'Backend Flask operacional via proxy.',
-        detalhes: resProxy.data,
-      };
-    }
-  } catch (_e) {
-    // Falha
-  }
-
-  return {
-    statusOk: false,
-    mensagem: `Aviso: O backend Flask (http://192.168.100.141:5000/status) está inacessível. Certifique-se de que a API Flask está a rodar na porta 5000.`,
-  };
 };
 
 // =============================================================================
