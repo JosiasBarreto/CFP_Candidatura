@@ -230,10 +230,13 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     );
   }
 
-  const cursosFiltrados = cursos.filter(
+  const safeProgramas = Array.isArray(programas) ? programas : [];
+  const safeCursos = Array.isArray(cursos) ? cursos : [];
+
+  const cursosFiltrados = safeCursos.filter(
     (c) => Number(c.fk_programa || c.programa_id) === Number(formData.programa_id)
   );
-  const listaCursosExibida = cursosFiltrados.length > 0 ? cursosFiltrados : cursos;
+  const listaCursosExibida = cursosFiltrados.length > 0 ? cursosFiltrados : safeCursos;
 
   return (
     <div className="space-y-6">
@@ -1009,7 +1012,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                     className="mt-1 w-full border border-emerald-300 rounded-lg p-2.5 text-xs font-semibold bg-emerald-50/40 text-slate-900 focus:outline-none focus:border-emerald-700 transition-all"
                   >
                     <option value="">Selecione o programa de formação...</option>
-                    {programas.map((p) => (
+                    {safeProgramas.map((p) => (
                       <option key={p.id || p.ID} value={p.id || p.ID}>
                         {p.nome}
                       </option>
@@ -1062,7 +1065,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                     className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
                   >
                     <option value="0">-- Nenhuma (Sem 2.ª Opção) --</option>
-                    {cursos
+                    {safeCursos
                       .filter((c) => Number(c.id || c.ID) !== Number(formData.curso_opcao1_id))
                       .map((c) => (
                         <option key={c.id || c.ID} value={c.id || c.ID}>

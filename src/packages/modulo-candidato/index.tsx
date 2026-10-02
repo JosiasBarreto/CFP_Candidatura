@@ -31,12 +31,12 @@ export const ModuloCandidatoApp: React.FC<ModuloCandidatoAppProps> = ({
   useEffect(() => {
     candidatoApi
       .listarProgramas()
-      .then(setProgramas)
-      .catch(() => {});
+      .then((res) => setProgramas(Array.isArray(res) ? res : []))
+      .catch(() => setProgramas([]));
     candidatoApi
       .listarCursos()
-      .then(setCursos)
-      .catch(() => {});
+      .then((res) => setCursos(Array.isArray(res) ? res : []))
+      .catch(() => setCursos([]));
   }, []);
 
   const handleEscolherCursoDoCatalogo = (curso: CursoPublico) => {

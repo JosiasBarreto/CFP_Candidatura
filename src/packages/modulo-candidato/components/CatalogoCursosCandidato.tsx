@@ -24,12 +24,15 @@ export const CatalogoCursosCandidato: React.FC<CatalogoCursosCandidatoProps> = (
   programas,
   aoEscolherCurso,
 }) => {
+  const safeCursos = Array.isArray(cursos) ? cursos : [];
+  const safeProgramas = Array.isArray(programas) ? programas : [];
+
   const [pesquisa, setPesquisa] = useState('');
   const [programaFiltro, setProgramaFiltro] = useState<number | 'todos'>('todos');
   const [horarioFiltro, setHorarioFiltro] = useState<string>('todos');
 
   const cursosFiltrados = useMemo(() => {
-    return cursos.filter((c) => {
+    return safeCursos.filter((c) => {
       // Filtro Programa
       if (programaFiltro !== 'todos') {
         const pId = Number(c.fk_programa || c.programa_id);
@@ -83,11 +86,11 @@ export const CatalogoCursosCandidato: React.FC<CatalogoCursosCandidatoProps> = (
 
           <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3.5 rounded-xl shrink-0">
             <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center font-bold text-lg">
-              {cursos.length}
+              {safeCursos.length}
             </div>
             <div>
               <p className="text-xs font-bold text-slate-900">Cursos Ativos</p>
-              <p className="text-[11px] text-slate-500">{programas.length} Programas Formativos</p>
+              <p className="text-[11px] text-slate-500">{safeProgramas.length} Programas Formativos</p>
             </div>
           </div>
         </div>
@@ -116,7 +119,7 @@ export const CatalogoCursosCandidato: React.FC<CatalogoCursosCandidatoProps> = (
               className="w-full border border-slate-300 rounded-xl py-2.5 px-3 text-xs bg-white focus:outline-none focus:border-emerald-700"
             >
               <option value="todos">Todos os Programas</option>
-              {programas.map((p) => (
+              {safeProgramas.map((p) => (
                 <option key={p.id || p.ID} value={p.id || p.ID}>
                   {p.nome}
                 </option>

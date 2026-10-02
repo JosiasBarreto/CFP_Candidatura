@@ -15,11 +15,14 @@ export const CatalogoCursosView: React.FC<CatalogoCursosViewProps> = ({
   isLoading,
   aoSelecionarCurso,
 }) => {
+  const safeCursos = Array.isArray(cursos) ? cursos : [];
+  const safeProgramas = Array.isArray(programas) ? programas : [];
+
   const [programaFiltro, setProgramaFiltro] = useState<string>('todos');
   const [pesquisa, setPesquisa] = useState<string>('');
 
   const cursosFiltrados = useMemo(() => {
-    return cursos.filter((c) => {
+    return safeCursos.filter((c) => {
       const matchProg =
         programaFiltro === 'todos' || String(c.programa_id) === String(programaFiltro);
       const termo = pesquisa.trim().toLowerCase();
@@ -70,9 +73,9 @@ export const CatalogoCursosView: React.FC<CatalogoCursosViewProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Todos os Programas ({cursos.length})
+            Todos os Programas ({safeCursos.length})
           </button>
-          {programas.map((prog) => (
+          {safeProgramas.map((prog) => (
             <button
               key={prog.id}
               type="button"

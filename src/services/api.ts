@@ -52,8 +52,18 @@ export const programasService = {
    * Obtém a lista de programas de formação ativos no CFP-STP
    */
   async listar(): Promise<ProgramaPublico[]> {
-    const response = await apiClient.get<ProgramaPublico[]>('/programas');
-    return response.data;
+    try {
+      const response = await apiClient.get<any>('/programas');
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.programas)) return data.programas;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && Array.isArray(data.rows)) return data.rows;
+      return [];
+    } catch (e) {
+      console.warn('[programasService] Erro ao carregar programas do servidor:', e);
+      return [];
+    }
   },
 };
 
@@ -65,17 +75,36 @@ export const cursosService = {
    * Lista todos os cursos disponíveis ou filtra por programa
    */
   async listar(programaId?: number): Promise<CursoPublico[]> {
-    const params = programaId ? { programa_id: programaId } : {};
-    const response = await apiClient.get<CursoPublico[]>('/cursos', { params });
-    return response.data;
+    try {
+      const params = programaId ? { programa_id: programaId } : {};
+      const response = await apiClient.get<any>('/cursos', { params });
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.cursos)) return data.cursos;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && Array.isArray(data.rows)) return data.rows;
+      return [];
+    } catch (e) {
+      console.warn('[cursosService] Erro ao carregar cursos do servidor:', e);
+      return [];
+    }
   },
 
   /**
    * Busca cursos pelo endpoint direto de busca com filtro de ano
    */
   async buscarPorAno(ano?: number): Promise<CursoPublico[]> {
-    const response = await axios.post<CursoPublico[]>('/curso/busca', ano ? { ano_execucao: ano } : {});
-    return response.data;
+    try {
+      const response = await apiClient.post<any>('/curso/busca', ano ? { ano_execucao: ano } : {});
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.cursos)) return data.cursos;
+      if (data && Array.isArray(data.data)) return data.data;
+      return [];
+    } catch (e) {
+      console.warn('[cursosService] Erro ao buscar cursos por ano:', e);
+      return [];
+    }
   },
 };
 
