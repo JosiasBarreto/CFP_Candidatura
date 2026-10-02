@@ -25,10 +25,7 @@ const flaskProxy = createProxyMiddleware({
   changeOrigin: true,
   ws: false,
   pathRewrite: (path: string) => {
-    // Mapeamento automático de rotas
-    if (path === '/api/programas') return '/programa';
-    if (path === '/api/cursos') return '/curso/busca';
-    if (path === '/api/status') return '/status';
+    // Encaminha as rotas exatamente como especificadas na API Flask
     if (path.startsWith('/api/')) return path.replace(/^\/api/, '');
     return path;
   },
