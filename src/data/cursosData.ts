@@ -45,16 +45,42 @@ export const extrairProgramasDeCursos = (cursos: CursoItem[]): ProgramaItem[] =>
   return Array.from(map.values()).sort((a, b) => a.id - b.id);
 };
 
-// Consulta dinâmica da API POST /curso/busca (sem lista fixa no frontend)
+// Consulta dinâmica dos endpoints oficiais /api/cursos e /api/programas
 export const fetchCursosBusca = async (ano?: string): Promise<CursoItem[]> => {
-  const response = await axios.post<CursoItem[]>(
-    '/curso/busca',
-    ano ? { ano_execucao: Number(ano) } : {}
-  );
-  return Array.isArray(response.data) ? response.data : [];
+  try {
+    const params = ano ? { ano_execucao: Number(ano) } : {};
+    const response = await axios.get<any>('/api/cursos', { params });
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.cursos)) return data.cursos;
+    if (data && Array.isArray(data.data)) return data.data;
+    return [];
+  } catch (err) {
+    console.warn('[cursosData] Erro ao carregar /api/cursos:', err);
+    return [];
+  }
 };
 
 export const fetchProgramasOficiais = async (ano?: string): Promise<ProgramaItem[]> => {
+  try {
+    const response = await axios.get<any>('/api/programas');
+    const data = response.data;
+    const listaProgs = Array.isArray(data)
+      ? data
+      : data && Array.isArray(data.programas)
+      ? data.programas
+      : [];
+    if (listaProgs.length > 0) {
+      return listaProgs.map((p: any) => ({
+        id: Number(p.id || p.ID),
+        nome: p.nome,
+        totalCursos: 0,
+        exigeCertificadoProfissional: Number(p.id || p.ID) === 2,
+      }));
+    }
+  } catch (err) {
+    console.warn('[cursosData] Erro ao carregar /api/programas:', err);
+  }
   const cursos = await fetchCursosBusca(ano);
   return extrairProgramasDeCursos(cursos);
 };

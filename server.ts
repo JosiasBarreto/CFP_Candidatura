@@ -13,11 +13,11 @@ const PORT = process.env.PORT
   ? parseInt(process.env.FRONTEND_PORT, 10)
   : DEFAULT_PORT;
 
-// URL da API Flask do Utilizador (Padrão: localhost:5000 ou IP de rede local)
+// URL da API Flask do Utilizador (Padrão: 192.168.100.141:5000)
 const FLASK_BACKEND_URL =
   process.env.FLASK_BACKEND_URL ||
   process.env.BACKEND_URL ||
-  'http://localhost:5000';
+  'http://192.168.100.141:5000';
 
 console.log(`[CFP-STP Proxy] A encaminhar requisições para a API Flask em: ${FLASK_BACKEND_URL}`);
 
