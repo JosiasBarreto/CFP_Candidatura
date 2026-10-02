@@ -26,44 +26,21 @@ interface FichaComprovativoViewProps {
 }
 
 const CabecalhoOficialCfp: React.FC = () => (
-  <div className="flex flex-col items-center text-center mb-4">
-    {/* Emblema Vetorial CFP-STP */}
-    <svg
-      viewBox="0 0 120 75"
-      className="h-12 w-20 text-[#1a8026]"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M35 8 L52 25 L32 25 M60 5 L60 25 M85 8 L68 25 L88 25"
-        stroke="currentColor"
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+  <div className="flex flex-col items-center text-center mb-4 space-y-2">
+    <div className="flex items-center justify-between w-full max-w-2xl px-2">
+      <img
+        src="/assets/logos/IEFP__Logo_.svg"
+        alt="IEFP Logo"
+        className="h-9 sm:h-11 object-contain"
       />
-      <line x1="28" y1="30" x2="92" y2="30" stroke="currentColor" strokeWidth="2" />
-      <text
-        x="60"
-        y="41"
-        textAnchor="middle"
-        fill="currentColor"
-        fontSize="11"
-        fontWeight="bold"
-        fontFamily="sans-serif"
-      >
-        CFP-STP
-      </text>
-      <line x1="28" y1="45" x2="92" y2="45" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M35 67 L52 50 L32 50 M60 70 L60 50 M85 67 L68 50 L88 50"
-        stroke="currentColor"
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      <img
+        src="/assets/logos/CFPSTP.svg"
+        alt="CFP-STP Logo"
+        className="h-12 sm:h-14 object-contain"
       />
-    </svg>
-    <h3 className="mt-1 font-serif text-base sm:text-lg font-normal tracking-wide text-[#1a8026] uppercase">
+      <div className="w-16 hidden sm:block" />
+    </div>
+    <h3 className="font-serif text-base sm:text-lg font-bold tracking-wide text-[#1a8026] uppercase">
       CENTRO DE FORMAÇÃO PROFISSIONAL DE SÃO TOMÉ E PRÍNCIPE
     </h3>
   </div>
@@ -71,37 +48,43 @@ const CabecalhoOficialCfp: React.FC = () => (
 
 const RodapeOficialCfp: React.FC<{ pagina: '1/2' | '2/2' }> = ({ pagina }) => (
   <div className="mt-8 pt-4">
-    <p className="font-serif text-sm text-slate-900 mb-3">{pagina}</p>
-    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-3 text-[10px] text-slate-600">
-      {/* República Portuguesa */}
+    <p className="font-serif text-sm font-bold text-slate-900 mb-3">{pagina}</p>
+    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-3 text-[10px] text-slate-600">
+      {/* 1. República Portuguesa */}
       <div className="flex items-center gap-2">
-        <div className="flex h-6 w-5 overflow-hidden rounded-xs border border-slate-200">
-          <div className="w-2/5 bg-red-600" />
-          <div className="w-3/5 bg-[#1a8026] flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-amber-400" />
-          </div>
-        </div>
+        <img
+          src="/assets/logos/Republica%20protuguesa.svg"
+          alt="República Portuguesa Logo"
+          className="h-8 object-contain"
+        />
         <div className="leading-tight">
           <p className="font-bold text-slate-800 uppercase">República Portuguesa</p>
           <p className="text-[9px] text-slate-500">Trabalho, Solidariedade e Segurança Social</p>
         </div>
       </div>
 
-      {/* Centro: CFP-STP */}
-      <div className="text-center leading-tight">
-        <p className="font-bold text-[#1a8026]">CFP-STP</p>
-        <p className="text-[9px] font-semibold text-slate-700 uppercase">
-          R.D. São Tomé e Príncipe · Centro de Formação Profissional
-        </p>
+      {/* 2. Centro: CFP-STP */}
+      <div className="flex items-center gap-2 text-center leading-tight">
+        <img
+          src="/assets/logos/CFPSTP.svg"
+          alt="CFP-STP"
+          className="h-8 object-contain"
+        />
+        <div>
+          <p className="font-bold text-[#1a8026]">CFP-STP</p>
+          <p className="text-[9px] font-semibold text-slate-700 uppercase">
+            R.D. São Tomé e Príncipe · Centro de Formação Profissional
+          </p>
+        </div>
       </div>
 
-      {/* Cooperação Portuguesa */}
-      <div className="flex items-center gap-1.5">
-        <div className="h-6 w-4 border-l-4 border-t-4 border-b-4 border-red-600" />
-        <div className="leading-tight">
-          <p className="font-semibold text-slate-600 uppercase text-[9px]">Cooperação</p>
-          <p className="font-bold text-[#1a8026] uppercase text-[11px]">Portugal</p>
-        </div>
+      {/* 3. Cooperação Portuguesa */}
+      <div className="flex items-center gap-2">
+        <img
+          src="/assets/logos/cooperacao-prtuguesa.svg"
+          alt="Cooperação Portuguesa Logo"
+          className="h-8 object-contain"
+        />
       </div>
     </div>
   </div>

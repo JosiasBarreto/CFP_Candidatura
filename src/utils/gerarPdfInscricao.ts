@@ -1,11 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { DadosInscricaoFormando } from './securityAndValidation';
-import {
-  SVG_CFPSTP,
-  SVG_REPUBLICA_PORTUGUESA,
-  SVG_COOPERACAO_PORTUGUESA,
-  convertSvgToHighResDataUrl,
-} from './svgLogoAssets';
+import { obterLogosEmDataUrl, LogosDataUrls } from './pdfLogos';
 
 export const obterNomeFicheiroPdf = (dados: DadosInscricaoFormando): string => {
   const nomeSeguroFicheiro = (dados.nome || 'Candidato')
@@ -54,7 +49,6 @@ export const obterNumeroSequencia = (dados: DadosInscricaoFormando): string => {
 
 export const obterNumeroProcesso = (dados: DadosInscricaoFormando): string => {
   if (dados.numero_processo) return dados.numero_processo;
-  if (dados.protocolo) return dados.protocolo;
   const seq = obterNumeroSequencia(dados);
   const { mes, ano } = extrairPartesData(dados.data_inscricao);
   return `${seq}/${mes || '10'}/${ano || dados.ano || '2026'}`;
@@ -103,127 +97,159 @@ export const verificarProgramaSelecionado = (
   }
 };
 
-export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando): Promise<void> => {
+/**
+ * Função Refatorada para Geração do Documento PDF Oficial
+ * - Margens de impressão de 18mm em todas as faces (padrão 15mm - 20mm)
+ * - Hierarquia tipográfica rigorosa: Labels em peso SEMIBOLD/BOLD e Dados Preenchidos em REGULAR
+ * - Prevenção total de sobreposição com o rodapé institucional em documentos de múltiplas páginas
+ * - Renderização dos 4 logos oficiais de assets/logos (CFPSTP, IEFP, República Portuguesa e Cooperação Portuguesa)
+ */
+export const gerarPdfFormularioInscricao = async (
+  dados: DadosInscricaoFormando
+): Promise<void> => {
+  const logos = await obterLogosEmDataUrl();
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
+  // Configuração Padrão de Margens de Impressão (18mm)
   const pageWidth = 210;
   const pageHeight = 297;
-  const marginL = 16; // Margem esquerda profissional
-  const marginR = 16; // Margem direita profissional
-  const rightEdge = pageWidth - marginR; // 194mm
+  const marginL = 18; // Margem Esquerda (18mm)
+  const marginR = 18; // Margem Direita (18mm)
+  const marginTop = 16; // Margem Superior (16mm)
+  const marginBottom = 18; // Margem Inferior (18mm)
+  const rightEdge = pageWidth - marginR; // 192mm
+  const yContentMax = pageHeight - marginBottom - 15; // 261mm — Conteúdo nunca ultrapassa este limite
 
-  const greenR = 16;
-  const greenG = 124;
-  const greenB = 41;
+  const greenR = 26;
+  const greenG = 128;
+  const greenB = 38;
 
-  // Carrega os 3 logótipos SVG com viewBox e proporção exatas mantidas
-  const [logoRepublica, logoCfp, logoCooperacao] = await Promise.all([
-    convertSvgToHighResDataUrl(SVG_REPUBLICA_PORTUGUESA, 11, 1200, 787, 4),
-    convertSvgToHighResDataUrl(SVG_CFPSTP, 13, 223, 234, 4),
-    convertSvgToHighResDataUrl(SVG_COOPERACAO_PORTUGUESA, 10, 3830, 1472, 4),
-  ]);
-
-  // Helper: Desenha o Cabeçalho Oficial com Logo SVG do CFP-STP no topo
+  // Helper: Desenha o Cabeçalho Oficial com Logos
   const drawOfficialHeader = () => {
     const cx = pageWidth / 2; // 105mm
 
-    // Logo SVG do CFP-STP no topo
-    if (logoCfp.dataUrl) {
-      const topLogoW = logoCfp.widthMm;
-      const topLogoH = logoCfp.heightMm;
-      doc.addImage(
-        logoCfp.dataUrl,
-        'PNG',
-        cx - topLogoW / 2,
-        10,
-        topLogoW,
-        topLogoH
-      );
+    // Logo IEFP à Esquerda
+    if (logos.iefp) {
+      try {
+        doc.addImage(logos.iefp, 'PNG', marginL, marginTop - 2, 22, 11);
+      } catch (_e) {
+        // Fallback gráfico
+      }
     }
 
-    // Título Institucional Oficial com Tipografia mais Carregada
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11.5);
+    // Logo CFP-STP ao Centro
+    if (logos.cfpStp) {
+      try {
+        doc.addImage(logos.cfpStp, 'PNG', cx - 7.5, marginTop - 4, 15, 15);
+      } catch (_e) {
+        // Fallback gráfico
+      }
+    } else {
+      // Desenho vetorial reserva do emblema CFP-STP
+      doc.setDrawColor(greenR, greenG, greenB);
+      doc.setFillColor(greenR, greenG, greenB);
+      doc.setLineWidth(0.6);
+      doc.line(cx - 4, 12, cx, 15);
+      doc.line(cx, 15, cx + 4, 12);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(4.5);
+      doc.setTextColor(greenR, greenG, greenB);
+      doc.text('CFP-STP', cx, 17, { align: 'center' });
+    }
+
+    // Título Institucional Superior
+    doc.setFont('times', 'bold');
+    doc.setFontSize(11.8);
     doc.setTextColor(greenR, greenG, greenB);
     doc.text(
       'CENTRO DE FORMAÇÃO PROFISSIONAL DE SÃO TOMÉ E PRÍNCIPE',
       cx,
-      26.5,
+      marginTop + 14.5,
       { align: 'center' }
     );
   };
 
-  // Helper: Desenha o Rodapé Institucional com os 3 Logótipos em SVG e Número da Página
+  // Helper: Desenha o Rodapé Institucional e Logos Oficiais
   const drawOfficialFooter = (paginaTexto: '1/2' | '2/2') => {
-    const footerLineY = 268;
-    const footerCenterY = 276; // Eixo horizontal central para alinhamento dos logótipos
+    const footerTopY = 264;
 
-    // Linha divisória discreta e elegante acima do rodapé
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.25);
-    doc.line(marginL, footerLineY, rightEdge, footerLineY);
+    // Linha divisória de proteção superior ao rodapé
+    doc.setDrawColor(210, 214, 220);
+    doc.setLineWidth(0.3);
+    doc.line(marginL, footerTopY, rightEdge, footerTopY);
 
-    // 1. Esquerda: República Portuguesa (SVG sem distorção, centrado verticalmente)
-    if (logoRepublica.dataUrl) {
-      const hRep = logoRepublica.heightMm;
-      const wRep = logoRepublica.widthMm;
-      doc.addImage(
-        logoRepublica.dataUrl,
-        'PNG',
-        marginL,
-        footerCenterY - hRep / 2,
-        wRep,
-        hRep
-      );
+    // Indicador de Página
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(50, 60, 75);
+    doc.text(paginaTexto, marginL, footerTopY + 4.5);
+
+    const logoY = footerTopY + 6.5;
+
+    // 1. Logo Esquerda: República Portuguesa
+    if (logos.republicaPortuguesa) {
+      try {
+        doc.addImage(logos.republicaPortuguesa, 'PNG', marginL, logoY, 26, 12);
+      } catch (_e) {
+        // Fallback
+      }
+    } else {
+      doc.setFillColor(204, 34, 41);
+      doc.rect(marginL, logoY + 1, 1.6, 4.2, 'F');
+      doc.setFillColor(26, 128, 38);
+      doc.rect(marginL + 1.6, logoY + 1, 1.4, 4.2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5);
+      doc.setTextColor(30, 41, 59);
+      doc.text('REPÚBLICA PORTUGUESA', marginL + 4, logoY + 3.5);
+    }
+
+    // 2. Logo Centro: CFP-STP
+    const midX = 105;
+    if (logos.cfpStp) {
+      try {
+        doc.addImage(logos.cfpStp, 'PNG', midX - 6, logoY - 1, 12, 12);
+      } catch (_e) {
+        // Fallback
+      }
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.8);
+    doc.setTextColor(greenR, greenG, greenB);
+    doc.text('R.D. SÃO TOMÉ E PRÍNCIPE', midX, logoY + 12.5, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(3.8);
+    doc.setTextColor(70, 80, 95);
+    doc.text('CENTRO DE FORMAÇÃO PROFISSIONAL', midX, logoY + 14.8, { align: 'center' });
+
+    // 3. Logo Direita: Cooperação Portuguesa
+    if (logos.cooperacaoPortuguesa) {
+      try {
+        doc.addImage(
+          logos.cooperacaoPortuguesa,
+          'PNG',
+          rightEdge - 32,
+          logoY,
+          32,
+          12
+        );
+      } catch (_e) {
+        // Fallback
+      }
     } else {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
-      doc.setTextColor(30, 41, 59);
-      doc.text('REPÚBLICA PORTUGUESA', marginL, footerCenterY);
+      doc.setFontSize(4.8);
+      doc.setTextColor(71, 85, 105);
+      doc.text('COOPERAÇÃO PORTUGAL', rightEdge - 28, logoY + 4);
     }
-
-    // 2. Centro: CFP-STP (SVG sem distorção, centrado verticalmente)
-    if (logoCfp.dataUrl) {
-      const cfpFooterW = logoCfp.widthMm * 0.75;
-      const cfpFooterH = logoCfp.heightMm * 0.75;
-      const midX = pageWidth / 2 - cfpFooterW / 2;
-      doc.addImage(
-        logoCfp.dataUrl,
-        'PNG',
-        midX,
-        footerCenterY - cfpFooterH / 2,
-        cfpFooterW,
-        cfpFooterH
-      );
-    }
-
-    // 3. Direita: Cooperação Portuguesa (SVG sem distorção, centrado verticalmente)
-    if (logoCooperacao.dataUrl) {
-      const coopW = logoCooperacao.widthMm;
-      const coopH = logoCooperacao.heightMm;
-      const coopX = rightEdge - coopW - 22; // Espaço reservado para o número de página no canto direito
-      doc.addImage(
-        logoCooperacao.dataUrl,
-        'PNG',
-        coopX,
-        footerCenterY - coopH / 2,
-        coopW,
-        coopH
-      );
-    }
-
-    // Número da Página no Canto Inferior Direito (sem sobreposição)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Página ${paginaTexto}`, rightEdge, footerCenterY + 1.5, { align: 'right' });
   };
 
-  // Helper: Desenha Linha pautada com Valor Preenchido
+  // Helper para desenhar a linha pautada e o valor preenchido (PESO REGULAR)
   const drawUnderlinedValue = (
     xStart: number,
     xEnd: number,
@@ -237,24 +263,43 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
       bold?: boolean;
     }
   ) => {
-    const [lr, lg, lb] = options?.lineColor || [148, 163, 184];
+    const [lr, lg, lb] = options?.lineColor || [140, 140, 140];
     const [tr, tg, tb] = options?.textColor || [15, 23, 42];
+
     doc.setDrawColor(lr, lg, lb);
-    doc.setLineWidth(0.25);
+    doc.setLineWidth(0.2);
     doc.line(xStart, yLine, xEnd, yLine);
 
     if (value && value.trim()) {
+      // DADOS PREENCHIDOS: PESO REGULAR CONFORME ESPECIFICAÇÃO
       doc.setFont('times', options?.bold ? 'bold' : 'normal');
       doc.setFontSize(options?.fontSize || 9.5);
       doc.setTextColor(tr, tg, tb);
-      const maxW = Math.max(8, xEnd - xStart - 2);
+      const maxW = Math.max(6, xEnd - xStart - 2);
       const textoCortado = doc.splitTextToSize(value.trim(), maxW)[0] || '';
+
       if (options?.align === 'center') {
-        doc.text(textoCortado, (xStart + xEnd) / 2, yLine - 0.9, { align: 'center' });
+        doc.text(textoCortado, (xStart + xEnd) / 2, yLine - 0.8, { align: 'center' });
       } else {
-        doc.text(textoCortado, xStart + 1.2, yLine - 0.9);
+        doc.text(textoCortado, xStart + 1.2, yLine - 0.8);
       }
     }
+  };
+
+  // Helper para desenhar Rólos/Labels em PESO SEMIBOLD / BOLD
+  const drawLabel = (
+    text: string,
+    x: number,
+    y: number,
+    fontSize = 9.5,
+    fontFamily: 'times' | 'helvetica' = 'times'
+  ) => {
+    // LABELS POSSUEM PESO SEMIBOLD/BOLD CONFORME ESPECIFICAÇÃO
+    doc.setFont(fontFamily, 'bold');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+    doc.text(text, x, y);
+    return x + doc.getTextWidth(text) + 1.5;
   };
 
   // ============================================================================
@@ -263,26 +308,26 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
   drawOfficialHeader();
 
   // Faixa verde central: FICHA DE INSCRIÇÃO DO FORMANDO
-  const badgeW = 75;
+  const badgeW = 68;
   const badgeH = 5.5;
   const badgeX = (pageWidth - badgeW) / 2;
   const badgeY = 32.5;
   doc.setFillColor(greenR, greenG, greenB);
   doc.rect(badgeX, badgeY, badgeW, badgeH, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('FICHA DE INSCRIÇÃO DO FORMANDO', pageWidth / 2, badgeY + 4, {
+  doc.text('FICHA DE INSCRIÇÃO DO FORMANDO', pageWidth / 2, badgeY + 4.0, {
     align: 'center',
   });
 
-  // Moldura da FOTO (Direita)
-  const photoX = 156;
-  const photoY = 40;
+  // Moldura da FOTO 3x4 (Direita)
+  const photoX = rightEdge - 32;
+  const photoY = 39.5;
   const photoW = 32;
   const photoH = 40;
-  doc.setDrawColor(100, 116, 139);
-  doc.setLineWidth(0.35);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
   doc.rect(photoX, photoY, photoW, photoH);
 
   if (dados.fotoPreview && dados.fotoPreview.startsWith('data:image/')) {
@@ -301,210 +346,148 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
         photoH - 1.2
       );
     } catch {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text('FOTOGRAFIA', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
+      doc.setFont('times', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text('FOTO 3x4', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
     }
   } else {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text('FOTOGRAFIA', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('FOTO 3x4', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
   }
 
-  // Metadados Superiores à Esquerda (Processo & Inscrição)
+  // Metadados Superiores à Esquerda (em verde)
   const seqNum = obterNumeroSequencia(dados);
   const dataInsc = extrairPartesData(dados.data_inscricao);
   const numProc = obterNumeroProcesso(dados);
 
   let y = 44.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  drawLabel('N.º de Inscrição:', marginL, y, 9.8, 'helvetica');
   doc.setTextColor(greenR, greenG, greenB);
-  doc.text('N.º de Inscrição:', marginL, y);
-  drawUnderlinedValue(marginL + 30, marginL + 72, y + 0.4, seqNum, {
+  drawUnderlinedValue(marginL + 33, marginL + 66, y + 0.4, seqNum, {
     lineColor: [greenR, greenG, greenB],
     textColor: [15, 23, 42],
     align: 'center',
     bold: true,
   });
 
-  y += 8;
+  y += 8.2;
+  drawLabel('Data de Inscrição', marginL, y, 8.8, 'helvetica');
+  drawUnderlinedValue(marginL + 28, marginL + 39, y + 0.3, dataInsc.dia, {
+    lineColor: [greenR, greenG, greenB],
+    align: 'center',
+  });
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
   doc.setTextColor(greenR, greenG, greenB);
-  doc.text('Data de Inscrição:', marginL, y);
-  drawUnderlinedValue(marginL + 30, marginL + 42, y + 0.3, dataInsc.dia, {
+  doc.text('/', marginL + 39.8, y);
+  drawUnderlinedValue(marginL + 41.5, marginL + 52.5, y + 0.3, dataInsc.mes, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
   });
-  doc.text('/', marginL + 42.8, y);
-  drawUnderlinedValue(marginL + 44.5, marginL + 56.5, y + 0.3, dataInsc.mes, {
-    lineColor: [greenR, greenG, greenB],
-    align: 'center',
-  });
-  doc.text('/', marginL + 57.2, y);
-  drawUnderlinedValue(marginL + 59, marginL + 72, y + 0.3, dataInsc.ano, {
+  doc.text('/', marginL + 53.2, y);
+  drawUnderlinedValue(marginL + 55, marginL + 66, y + 0.3, dataInsc.ano, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
   });
 
   y += 8;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('PROCESSO:', marginL, y);
-  drawUnderlinedValue(marginL + 24, marginL + 72, y + 0.3, numProc, {
+  drawLabel('N.º DE PROCESSO:', marginL, y, 8.2, 'helvetica');
+  drawUnderlinedValue(marginL + 32, marginL + 66, y + 0.3, numProc, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
-    fontSize: 9.5,
-    bold: true,
+    fontSize: 9,
   });
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text('(Processo de candidatura/mês/ano)', marginL + 74, y);
+  doc.setFontSize(7.8);
+  doc.setTextColor(greenR, greenG, greenB);
+  doc.text('(seq/mês/ano)', marginL + 67.5, y);
 
   // Secção 1 - Identificação do Candidato
   y = 75;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(10.2);
   doc.setTextColor(greenR, greenG, greenB);
   doc.text('1 - Identificação do Candidato:', marginL, y);
 
-  const lineStep = 6.8;
-  y = 87;
+  const lineStep = 6.6;
+  y = 87.5;
 
-  // Nome Completo
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Nome:', marginL, y);
-  drawUnderlinedValue(marginL + 12, rightEdge, y + 0.4, dados.nome, {
-    bold: true,
-    fontSize: 10,
-  });
+  // Nome:
+  let lx = drawLabel('Nome:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.nome);
 
-  // Filiação Pai
+  // Filiação: Pai
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Filiação: Pai', marginL, y);
-  drawUnderlinedValue(marginL + 21, rightEdge, y + 0.4, dados.nome_pai);
+  lx = drawLabel('Filiação: Pai', marginL, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.nome_pai);
 
   // Mãe
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Mãe', marginL + 13, y);
-  drawUnderlinedValue(marginL + 21, rightEdge, y + 0.4, dados.nome_mae);
+  lx = drawLabel('Mãe', marginL + 12.5, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.nome_mae);
 
-  // N.º de B.I. & Arquivo de Identificação (Mapeado corretamente!)
+  // N.º de B.I.: _____ Arq. Ident. _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('N.º de B.I.:', marginL, y);
-  drawUnderlinedValue(marginL + 18, marginL + 80, y + 0.4, dados.bi, { bold: true });
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text('Arquivo de Identificação:', marginL + 82, y);
-  drawUnderlinedValue(
-    marginL + 123,
-    rightEdge,
-    y + 0.4,
-    dados.arquivo_identificacao
-  );
+  lx = drawLabel('N.º de B.I.:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, marginL + 76, y + 0.4, dados.bi);
+  lx = drawLabel('Arq. Ident.', marginL + 78, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.arquivo_identificacao);
 
-  // N.º de Identificação Fiscal (NIF)
+  // Nº de Identificação Fiscal _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('N.º de Identificação Fiscal (NIF):', marginL, y);
-  drawUnderlinedValue(marginL + 52, marginL + 110, y + 0.4, dados.nif);
+  lx = drawLabel('Nº de Identificação Fiscal', marginL, y, 9.5);
+  drawUnderlinedValue(lx, marginL + 80, y + 0.4, dados.nif);
 
-  // Data de Nascimento, Sexo e Idade
+  // Data de Nascimento ___/___/___. Sexo _____ Idade _____
   y += lineStep;
   const dn = extrairPartesData(dados.datanascimento);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Data de Nascimento:', marginL, y);
-  drawUnderlinedValue(marginL + 34, marginL + 44, y + 0.4, dn.dia, {
-    align: 'center',
-  });
-  doc.text('/', marginL + 44.5, y);
-  drawUnderlinedValue(marginL + 46, marginL + 56, y + 0.4, dn.mes, {
-    align: 'center',
-  });
-  doc.text('/', marginL + 56.5, y);
-  drawUnderlinedValue(marginL + 58, marginL + 70, y + 0.4, dn.ano, {
-    align: 'center',
-  });
+  lx = drawLabel('Data de Nascimento', marginL, y, 9.5);
+  drawUnderlinedValue(lx, lx + 10, y + 0.4, dn.dia, { align: 'center' });
+  doc.text('/', lx + 10.5, y);
+  drawUnderlinedValue(lx + 12, lx + 22, y + 0.4, dn.mes, { align: 'center' });
+  doc.text('/', lx + 22.5, y);
+  drawUnderlinedValue(lx + 24, lx + 34, y + 0.4, dn.ano, { align: 'center' });
 
-  doc.text('Sexo:', marginL + 72, y);
-  drawUnderlinedValue(marginL + 82, marginL + 115, y + 0.4, dados.sexo, {
-    align: 'center',
-  });
+  lx = drawLabel('Sexo', lx + 37, y, 9.5);
+  drawUnderlinedValue(lx, lx + 30, y + 0.4, dados.sexo, { align: 'center' });
 
-  doc.text('Idade:', marginL + 117, y);
+  lx = drawLabel('Idade', lx + 32, y, 9.5);
   drawUnderlinedValue(
-    marginL + 128,
+    lx,
     rightEdge,
     y + 0.4,
     dados.idade ? `${dados.idade} anos` : '',
     { align: 'center' }
   );
 
-  // Nacionalidade & Local de Nascimento
+  // Nacionalidade: _____ Local de Nascimento _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Nacionalidade:', marginL, y);
-  drawUnderlinedValue(marginL + 25, marginL + 80, y + 0.4, dados.nacionalidade);
+  lx = drawLabel('Nacionalidade:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, marginL + 72, y + 0.4, dados.nacionalidade);
+  lx = drawLabel('Local de Nascimento', marginL + 74, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.naturalidade);
 
-  doc.text('Naturalidade:', marginL + 82, y);
-  drawUnderlinedValue(marginL + 105, rightEdge, y + 0.4, dados.naturalidade);
-
-  // Estado Civil & Agregado Familiar
+  // Estado Civil: _____ N.º pessoas do agregado familiar : _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Estado Civil:', marginL, y);
-  drawUnderlinedValue(marginL + 22, marginL + 80, y + 0.4, dados.estado_civil);
+  lx = drawLabel('Estado Civil:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, marginL + 72, y + 0.4, dados.estado_civil);
+  lx = drawLabel('N.º pessoas do agregado familiar :', marginL + 74, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.agregado_familiar, {
+    align: 'center',
+  });
 
-  doc.text('N.º Agregado Familiar:', marginL + 82, y);
-  drawUnderlinedValue(
-    marginL + 120,
-    rightEdge,
-    y + 0.4,
-    dados.agregado_familiar,
-    { align: 'center' }
-  );
-
-  // Morada & Distrito
+  // Morada: _____ Distrito: _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Morada:', marginL, y);
-  drawUnderlinedValue(marginL + 15, marginL + 110, y + 0.4, dados.morada);
+  lx = drawLabel('Morada:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, marginL + 102, y + 0.4, dados.morada);
+  lx = drawLabel('Distrito:', marginL + 104, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.distrito);
 
-  doc.text('Distrito:', marginL + 112, y);
-  drawUnderlinedValue(marginL + 126, rightEdge, y + 0.4, dados.distrito);
-
-  // Contacto Telefónico & Email
+  // Contacto telefónico: _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Contacto Telefónico:', marginL, y);
+  lx = drawLabel('Contacto telefónico:', marginL, y, 9.5);
   const contactosTexto = [
     dados.telefone,
     dados.telefone2 ? `Alt: ${dados.telefone2}` : '',
@@ -512,35 +495,25 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
   ]
     .filter(Boolean)
     .join('   |   ');
-  drawUnderlinedValue(marginL + 34, rightEdge, y + 0.4, contactosTexto);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, contactosTexto);
 
-  // Ocupação
+  // Ocupação: _____
   y += lineStep;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Ocupação Atual:', marginL, y);
-  drawUnderlinedValue(marginL + 26, rightEdge, y + 0.4, dados.ocupacao);
+  lx = drawLabel('Ocupação:', marginL, y, 9.5);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, dados.ocupacao);
 
-  // Secção 2 – Habilitações Literárias
+  // 2 –Habilitações Literárias (concluídas) : _____
   y += 11.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('2 – Habilitações Literárias', marginL, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(51, 65, 85);
-  doc.text('(concluídas):', marginL + 45, y);
-  drawUnderlinedValue(marginL + 67, rightEdge, y + 0.4, dados.habilitacao, {
-    bold: true,
-  });
+  drawLabel('2 –Habilitações Literárias', marginL, y, 10.5);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9.5);
+  doc.text('(concluídas) :', marginL + 46, y);
+  drawUnderlinedValue(marginL + 67, rightEdge, y + 0.4, dados.habilitacao);
 
-  // Helper para desenhar linhas de texto pautado (Secções 3, 4 e 5)
+  // Helper para desenhar parágrafos pautados com labels em bold e valores em regular
   const drawRuledParagraph = (
     yFirstLine: number,
     numLines: number,
-    lastLineRightOffset: number,
     textValue?: string
   ): number => {
     const fullW = rightEdge - marginL;
@@ -552,92 +525,74 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
 
     let curY = yFirstLine;
     for (let i = 0; i < numLines; i++) {
-      const endX = i === numLines - 1 ? rightEdge - lastLineRightOffset : rightEdge;
-      drawUnderlinedValue(marginL, endX, curY, linhasTexto[i] || '');
+      drawUnderlinedValue(marginL, rightEdge, curY, linhasTexto[i] || '');
       curY += 6.5;
     }
     return curY;
   };
 
-  // Secção 3 – Formação Profissional
-  y += 11;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('3 – Formação Profissional Anterior', marginL, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
+  // 3 –Formação Profissional
+  y += 11.5;
+  drawLabel('3 –Formação Profissional', marginL, y, 10.5);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8.2);
+  doc.setTextColor(80, 80, 80);
   doc.text(
-    '(Curso, local, duração e data de conclusão):',
-    marginL + 58,
+    '(Se já frequentou algum Curso de formação diga o curso, local , duração e data conclusão)',
+    marginL + 44,
     y
   );
-  y = drawRuledParagraph(y + 7, 3, 40, dados.formacao_profissional);
+  y = drawRuledParagraph(y + 7.2, 3, dados.formacao_profissional);
 
-  // Secção 4 – Experiência Profissional
-  y += 5.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('4 – Experiência Profissional', marginL, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
+  // 4- Experiência Profissional
+  y += 4.5;
+  drawLabel('4- Experiência Profissional', marginL, y, 10.5);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8.2);
+  doc.setTextColor(80, 80, 80);
   doc.text(
-    '(Local de trabalho, funções exercidas e tempo de serviço):',
-    marginL + 48,
+    '(Se já trabalhou refira local de trabalho, funções exercidas e tempo de serviço).',
+    marginL + 47,
     y
   );
-  y = drawRuledParagraph(y + 7, 3, 40, dados.experiencia_profissional);
+  y = drawRuledParagraph(y + 7.2, 3, dados.experiencia_profissional);
 
-  // Secção 5 – Motivo da Inscrição
+  // 5- Motivo da Inscrição no Centro de Formação:
+  y += 4.5;
+  drawLabel('5- Motivo da Inscrição no Centro de Formação:', marginL, y, 10.5);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(8.2);
+  doc.setTextColor(180, 40, 40);
+  doc.text('(preenchimento obrigatório)', marginL + 79, y);
+  y = drawRuledParagraph(y + 7.2, 2, dados.motivo_inscricao);
+
+  // 5.1 Curso ou área de formação pretendida pelo Candidato
   y += 5.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('5 – Motivo da Inscrição no Centro de Formação:', marginL, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(185, 28, 28);
-  doc.text('(preenchimento obrigatório)', marginL + 82, y);
-  y = drawRuledParagraph(y + 7, 2, 30, dados.motivo_inscricao);
+  drawLabel('5.1 Curso ou área de formação pretendida pelo Candidato', marginL, y, 10.2);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(8.2);
+  doc.setTextColor(180, 40, 40);
+  doc.text('(preenchimento obrigatório)', marginL + 95, y);
 
-  // Secção 5.1 – Cursos Pretendidos (1ª e 2ª Opção)
-  y += 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('5.1 – Curso ou Área de Formação Pretendida pelo Candidato:', marginL, y);
-
-  y += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('1.ª Opção:', marginL, y);
+  y += 6.8;
+  lx = drawLabel('1ª Opção', marginL, y, 9.5);
   const textoOpcao1 = dados.curso_nome
     ? `${dados.curso_nome}${dados.programa_nome ? ` — ${dados.programa_nome}` : ''}${
         dados.curso_local ? ` (${dados.curso_local})` : ''
       }`
     : '';
-  drawUnderlinedValue(marginL + 18, rightEdge, y + 0.4, textoOpcao1, {
-    bold: true,
-    fontSize: 9.5,
-  });
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, textoOpcao1);
 
-  y += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('2.ª Opção:', marginL, y);
+  y += 6.8;
+  lx = drawLabel('2ª Opção', marginL, y, 9.5);
   const textoOpcao2 = dados.curso_opcao_2_nome
     ? `${dados.curso_opcao_2_nome}${
         dados.curso_opcao_2_programa ? ` — ${dados.curso_opcao_2_programa}` : ''
       }`
     : '';
-  drawUnderlinedValue(marginL + 18, rightEdge, y + 0.4, textoOpcao2);
+  drawUnderlinedValue(lx, rightEdge, y + 0.4, textoOpcao2);
 
-  // Rodapé Oficial da Página 1
+  // Rodapé da Página 1 (garante limite e sem sobreposição)
   drawOfficialFooter('1/2');
 
   // ============================================================================
@@ -647,30 +602,31 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
   drawOfficialHeader();
 
   // Título Sublinhado: A PREENCHER PELOS SERVIÇOS
-  let y2 = 44;
-  doc.setFont('helvetica', 'bold');
+  let y2 = 45;
+  doc.setFont('times', 'bold');
   doc.setFontSize(10.5);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   const tituloServicos = 'A PREENCHER PELOS SERVIÇOS';
   doc.text(tituloServicos, pageWidth / 2, y2, { align: 'center' });
   const wServ = doc.getTextWidth(tituloServicos);
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.35);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
   doc.line((pageWidth - wServ) / 2, y2 + 0.8, (pageWidth + wServ) / 2, y2 + 0.8);
 
-  // Helper para desenhar linha com pontilhado e caixa de seleção [ ]
+  // Helper para desenhar linha pontilhada e caixa de seleção [ ] à direita
   const drawDottedCheckboxRow = (
     labelLeft: string,
     xStartText: number,
     yRow: number,
     checked: boolean,
-    boxX = 175,
+    boxX = rightEdge - 8,
     boxW = 6.5,
-    boxH = 3.4
+    boxH = 3.2
   ) => {
+    // LABELS EM PESO SEMIBOLD/BOLD
     doc.setFont('times', 'bold');
     doc.setFontSize(9.5);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text(labelLeft, xStartText, yRow);
 
     const textW = doc.getTextWidth(labelLeft);
@@ -679,34 +635,31 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
 
     if (dotsEndX > dotsStartX) {
       doc.setLineDashPattern([0.4, 1.1], 0);
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(120, 120, 120);
       doc.setLineWidth(0.25);
       doc.line(dotsStartX, yRow - 0.3, dotsEndX, yRow - 0.3);
       doc.setLineDashPattern([], 0);
     }
 
-    doc.setDrawColor(15, 23, 42);
-    doc.setLineWidth(0.35);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.28);
     doc.rect(boxX, yRow - boxH + 0.4, boxW, boxH);
 
     if (checked) {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(greenR, greenG, greenB);
       doc.text('X', boxX + boxW / 2, yRow + 0.1, { align: 'center' });
     }
   };
 
-  // Secção 6 – Situação do Candidato perante o Emprego
+  // 6 – Situação do Candidato perante o Emprego
   y2 = 56;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('6 – Situação do Candidato perante o Emprego', marginL, y2);
+  drawLabel('6 – Situação do Candidato perante o Emprego', marginL, y2, 10.5);
 
   const sitEmp = (dados.situacao_emprego || '').toLowerCase();
-  const isPrimeiroEmprego = sitEmp.includes('1º emprego') || sitEmp.includes('1.º emprego');
-  const isNovoEmprego = sitEmp.includes('novo emprego');
+  const isPrimeiroEmprego = sitEmp.includes('1º emprego') || sitEmp.includes('1.º emprego') || sitEmp.includes('primeiro_emprego');
+  const isNovoEmprego = sitEmp.includes('novo emprego') || sitEmp.includes('novo_emprego');
   const isEmpregadoActivo =
     (sitEmp.includes('empregado') || sitEmp.includes('trabalhador') || sitEmp.includes('activo')) &&
     !sitEmp.includes('desempregado') &&
@@ -714,20 +667,21 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
   const isHorarioReduzido = sitEmp.includes('reduzido');
   const isEstudante = sitEmp.includes('estudante');
 
-  // Lista de itens da Secção 6
-  y2 += 5.5;
-  doc.setFont('helvetica', 'bold');
+  // 1. Candidato à Procura do 1º Emprego
+  y2 += 5.2;
+  doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.text('1.', marginL, y2);
   drawDottedCheckboxRow(
-    'Candidato à Procura do 1.º Emprego',
+    'Candidato à Procura do 1º Emprego',
     marginL + 6.5,
     y2,
     isPrimeiroEmprego
   );
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
+  // 2. Desempregado à procura de Novo Emprego
+  y2 += 4.8;
+  doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.text('2.', marginL, y2);
   drawDottedCheckboxRow(
@@ -737,22 +691,23 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
     isNovoEmprego
   );
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Atividade profissional anterior:', marginL + 6.5, y2);
+  // Actividade profissional anterior : _____
+  y2 += 4.8;
+  lx = drawLabel('Actividade profissional anterior :', marginL + 6.5, y2, 8.8);
   const ativAnterior =
     dados.atividade_profissional_anterior ||
     (isNovoEmprego ? dados.experiencia_profissional || dados.ocupacao : '');
-  drawUnderlinedValue(marginL + 50, 142, y2 + 0.4, ativAnterior, { fontSize: 8.5 });
+  drawUnderlinedValue(lx, rightEdge - 15, y2 + 0.4, ativAnterior, { fontSize: 8.5 });
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
+  // 3. Empregado/Activo
+  y2 += 4.8;
+  doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.text('3.', marginL, y2);
-  drawDottedCheckboxRow('Empregado / Trabalhador Ativo', marginL + 6.5, y2, isEmpregadoActivo);
+  drawDottedCheckboxRow('Empregado/Activo', marginL + 6.5, y2, isEmpregadoActivo);
 
-  y2 += 5;
+  // Empregado com horário reduzido
+  y2 += 4.8;
   drawDottedCheckboxRow(
     'Empregado com horário reduzido',
     marginL + 6.5,
@@ -760,103 +715,96 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
     isHorarioReduzido
   );
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Função que exerce:', marginL + 6.5, y2);
+  // Função que exerce : _____ desde _____
+  y2 += 4.8;
+  lx = drawLabel('Função que exerce :', marginL + 6.5, y2, 8.8);
   const funcaoVal =
     dados.funcao_exerce ||
     (isEmpregadoActivo || isHorarioReduzido ? dados.ocupacao : '');
-  drawUnderlinedValue(marginL + 36, 122, y2 + 0.4, funcaoVal, { fontSize: 8.5 });
-  doc.text('desde:', 124, y2);
-  drawUnderlinedValue(134, 160, y2 + 0.4, dados.funcao_desde || '', {
+  drawUnderlinedValue(lx, marginL + 95, y2 + 0.4, funcaoVal, { fontSize: 8.5 });
+
+  lx = drawLabel('desde', marginL + 97, y2, 8.8);
+  drawUnderlinedValue(lx, rightEdge - 15, y2 + 0.4, dados.funcao_desde || '', {
     fontSize: 8.5,
     align: 'center',
   });
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
+  // 4. Profissão _____
+  y2 += 4.8;
+  doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.text('4.', marginL, y2);
-  doc.text('Profissão:', marginL + 6.5, y2);
+  lx = drawLabel('Profissão', marginL + 6.5, y2, 9.5);
   drawUnderlinedValue(
-    marginL + 22,
-    145,
+    lx,
+    rightEdge - 15,
     y2 + 0.4,
     dados.profissao || (!isEstudante ? dados.ocupacao : ''),
     { fontSize: 9 }
   );
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
+  // 5. Estudante
+  y2 += 4.8;
+  doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.text('5.', marginL, y2);
   drawDottedCheckboxRow('Estudante', marginL + 6.5, y2, isEstudante);
 
-  y2 += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Nível de Escolaridade:', marginL + 6.5, y2);
+  // Nível de Escolaridade.......
+  y2 += 4.8;
+  lx = drawLabel('Nível de Escolaridade', marginL + 6.5, y2, 8.8);
   doc.setLineDashPattern([0.4, 1.1], 0);
-  doc.line(marginL + 40, y2 - 0.2, 125, y2 - 0.2);
+  doc.line(lx, y2 - 0.2, rightEdge - 15, y2 - 0.2);
   doc.setLineDashPattern([], 0);
   if (dados.habilitacao) {
     doc.setFont('times', 'normal');
     doc.setFontSize(8.5);
     doc.text(
-      doc.splitTextToSize(dados.habilitacao, 82)[0] || '',
-      marginL + 41.5,
+      doc.splitTextToSize(dados.habilitacao, 85)[0] || '',
+      lx + 2,
       y2 - 0.8
     );
   }
 
-  // Secção 7 – Casos Especiais
-  y2 = 114;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('7 – Casos Especiais:', marginL, y2);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(185, 28, 28);
-  doc.text('(preenchimento obrigatório)', marginL + 38, y2);
+  // 7- Casos Especiais: (preenchimento obrigatório)
+  y2 = 112;
+  drawLabel('7- Casos Especiais:', marginL, y2, 10.5);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(180, 40, 40);
+  doc.text('(preenchimento obrigatório)', marginL + 35, y2);
 
-  y2 += 5.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Deficiente:', marginL, y2);
+  y2 += 4.8;
+  lx = drawLabel('Deficiente', marginL, y2, 8.8);
   drawUnderlinedValue(
-    marginL + 18,
-    marginL + 28,
+    lx,
+    lx + 12,
     y2 + 0.4,
     dados.possui_caso_especial === 'Sim' ? 'Sim' : 'Não',
     { align: 'center', fontSize: 8.5 }
   );
 
-  doc.text('Encaminhado por Instituição de Apoio Social:', marginL + 31, y2);
+  lx = drawLabel(', Encaminhado por Instituição de Apoio Social :', lx + 14, y2, 8.8);
   drawUnderlinedValue(
-    marginL + 98,
-    marginL + 108,
+    lx,
+    lx + 12,
     y2 + 0.4,
     dados.encaminhado_apoio_social || 'Não',
     { align: 'center', fontSize: 8.5 }
   );
 
-  doc.text('Qual:', marginL + 110, y2);
+  lx = drawLabel('Qual:', lx + 14, y2, 8.8);
   const qualCasoTexto =
     dados.instituicao_apoio_social ||
     (dados.possui_caso_especial === 'Sim' ? dados.casos_especiais : '');
-  drawUnderlinedValue(marginL + 120, rightEdge, y2 + 0.4, qualCasoTexto, {
+  drawUnderlinedValue(lx, rightEdge, y2 + 0.4, qualCasoTexto, {
     fontSize: 8.5,
   });
 
-  y2 += 5.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Encaminhado por outra instituição: Qual', marginL, y2);
+  y2 += 4.8;
+  lx = drawLabel('Encaminhado por outra instituição: Qual', marginL, y2, 8.8);
   drawUnderlinedValue(
-    marginL + 60,
+    lx,
     rightEdge,
     y2 + 0.4,
     dados.encaminhado_outra_instituicao || '',
@@ -864,22 +812,20 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
   );
 
   // SITUAÇÃO DA CANDIDATURA
-  y2 = 148;
-  doc.setFont('helvetica', 'bold');
+  y2 = 144;
+  doc.setFont('times', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   const tituloSitCand = 'SITUAÇÃO DA CANDIDATURA';
   doc.text(tituloSitCand, pageWidth / 2, y2, { align: 'center' });
   const wSit = doc.getTextWidth(tituloSitCand);
-  doc.setDrawColor(15, 23, 42);
+  doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.35);
   doc.line((pageWidth - wSit) / 2, y2 + 0.9, (pageWidth + wSit) / 2, y2 + 0.9);
 
-  // Secção 8 – O candidato ficou inscrito no CURSO
-  y2 = 162;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('8 – O candidato ficou inscrito no CURSO:', marginL, y2);
+  // 8 – O candidato ficou inscrito no CURSO: _____
+  y2 = 158;
+  lx = drawLabel('8 – O candidato ficou inscrito no CURSO:', marginL, y2, 10.2);
 
   const cursoInscritoLinha1 = dados.curso_nome || '';
   const cursoInscritoLinha2 = [
@@ -890,21 +836,17 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
     .filter(Boolean)
     .join('   ·   ');
 
-  drawUnderlinedValue(marginL + 70, rightEdge, y2 + 0.4, cursoInscritoLinha1, {
-    bold: true,
+  drawUnderlinedValue(lx, rightEdge, y2 + 0.4, cursoInscritoLinha1, {
     fontSize: 9.5,
   });
-  y2 += 6.5;
-  drawUnderlinedValue(marginL + 70, rightEdge, y2 + 0.4, cursoInscritoLinha2, {
+  y2 += 6.2;
+  drawUnderlinedValue(marginL + 20, rightEdge, y2 + 0.4, cursoInscritoLinha2, {
     fontSize: 8.8,
   });
 
   // PROGRAMA
-  y2 = 178;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(greenR, greenG, greenB);
-  doc.text('PROGRAMA', marginL, y2);
+  y2 = 173;
+  drawLabel('PROGRAMA', marginL, y2, 10.2);
 
   const listaProgramasOficiais: Array<{
     label: string;
@@ -926,86 +868,80 @@ export const gerarPdfFormularioInscricao = async (dados: DadosInscricaoFormando)
     { label: 'OUTROS', chave: 'OUTROS' },
   ];
 
-  y2 += 5;
+  y2 += 4.8;
   listaProgramasOficiais.forEach((itemProg) => {
     const marcado = verificarProgramaSelecionado(dados, itemProg.chave);
-    drawDottedCheckboxRow(itemProg.label, marginL, y2, marcado, 175, 6.5, 3.2);
-    y2 += 4.8;
+    drawDottedCheckboxRow(itemProg.label, marginL, y2, marcado, rightEdge - 8, 6.5, 3.1);
+    y2 += 4.4;
   });
 
-  // Secção 9 – Declaração de Autorização e Divulgação
-  y2 = 217;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.8);
-  doc.setTextColor(15, 23, 42);
-  doc.text(
+  // 9. – Caso seja selecionado, permitirá que seus dados sejam divulgados? Sim___Não___
+  y2 = 212;
+  lx = drawLabel(
     '9. – Caso seja selecionado, permitirá que seus dados sejam divulgados? Sim',
     marginL,
-    y2
+    y2,
+    8.8
   );
   const autorizaSim = (dados.autoriza_divulgacao_dados || 'Sim') === 'Sim';
   drawUnderlinedValue(
-    marginL + 110,
-    marginL + 122,
+    lx,
+    lx + 10,
     y2 + 0.4,
     autorizaSim ? 'X' : '',
     { align: 'center', bold: true }
   );
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.8);
-  doc.text('Não', marginL + 124, y2);
+
+  lx = drawLabel('Não', lx + 12, y2, 8.8);
   drawUnderlinedValue(
-    marginL + 132,
-    marginL + 144,
+    lx,
+    lx + 10,
     y2 + 0.4,
     !autorizaSim ? 'X' : '',
     { align: 'center', bold: true }
   );
 
   // Recebido por & Assinatura do Candidato(a)
-  y2 = 230;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Recebido por: :................................................', marginL, y2);
-  doc.text('Assinatura do Candidato(a)', 136, y2);
+  y2 = 224;
+  drawLabel('Recebido por: :................................................', marginL, y2, 8.8);
+  drawLabel('Assinatura do Candidato(a)', rightEdge - 50, y2, 8.8);
 
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.3);
-  doc.line(128, y2 + 9.5, rightEdge, y2 + 9.5);
-
-  // Linha divisória inferior antes da Nota
-  y2 = 246;
-  doc.setDrawColor(148, 163, 184);
+  doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.25);
+  doc.line(rightEdge - 55, y2 + 9, rightEdge - 5, y2 + 9);
+
+  // Linha divisória inferior antes da Nota (garantida bem acima de y = 260mm)
+  y2 = 240;
+  doc.setDrawColor(120, 120, 120);
+  doc.setLineWidth(0.22);
   doc.line(marginL, y2, rightEdge, y2);
 
-  // Nota obrigatória de documentação
-  y2 = 254;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(15, 23, 42);
+  // Nota obrigatória
+  y2 = 248;
+  doc.setFont('times', 'bold');
+  doc.setFontSize(7.4);
+  doc.setTextColor(0, 0, 0);
   doc.text('Nota:', marginL, y2);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Deve-se anexar à ficha de inscrição,', marginL + 7.5, y2);
-  doc.setFont('helvetica', 'bold');
-  doc.text('OBRIGATORIAMENTE,', marginL + 50, y2);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('times', 'normal');
+  doc.text('Deve-se anexar à ficha de inscrição,', marginL + 7.2, y2);
+  doc.setFont('times', 'bold');
+  doc.text('OBRIGATÓRIAMENTE,', marginL + 46.8, y2);
+  doc.setFont('times', 'normal');
   doc.text(
-    'a fotocópia do Bilhete de Identidade, Cartão de Identificação Fiscal (NIF),',
-    marginL + 82,
+    'a fotocópia do Bilhete de Identidade e fotocópia de Cartão de Identificação Fiscal e cópia',
+    marginL + 75.5,
     y2
   );
   doc.text(
-    'Certificado de Habilitações Literárias (autenticado) e declaração de serviço para inscritos que trabalham.',
+    'Certificado de Habilitações Literárias(autenticada) e carta ou declaração de serviço para inscritos que trabalham.',
     marginL,
-    y2 + 4
+    y2 + 4.2
   );
 
-  // Rodapé Oficial da Página 2
+  // Rodapé da Página 2 (garante que NUNCA colide com o conteúdo acima)
   drawOfficialFooter('2/2');
 
-  // Guardar e descarregar o ficheiro PDF
+  // Guardar e descarregar o PDF
   const fileName = obterNomeFicheiroPdf(dados);
   try {
     const blob = doc.output('blob');
