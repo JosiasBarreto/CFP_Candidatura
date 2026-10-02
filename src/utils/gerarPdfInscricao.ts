@@ -99,11 +99,17 @@ export const verificarProgramaSelecionado = (
 
 /**
  * Função de Geração de PDF Refatorada
- * - Margens de impressão de 18mm (15mm-20mm)
- * - Cabeçalho: Logo CFP-STP colorido (tamanho reduzido)
- * - Rodapé: 1º República Portuguesa (Esquerda), 2º IEFP (Centro), 3º Cooperação Portuguesa (Direita)
- * - Hierarquia tipográfica: Labels em BOLD/SEMIBOLD, Dados preenchidos em REGULAR
- * - Ajuste de espaçamento compacto para garantir que o Ponto 5.1 e todo o conteúdo da Página 1 fiquem bem acima do rodapé
+ * - Margens de impressão padrão de 18mm (15mm-20mm)
+ * - Cabeçalho: Exclusivamente o Logo CFP-STP (tamanho reduzido e compacto)
+ * - Rodapé: Ordem exata:
+ *     1. República Portuguesa (Esquerda)
+ *     2. IEFP (Centro)
+ *     3. Cooperação Portuguesa (Direita)
+ * - Hierarquia tipográfica:
+ *     Rótulos/Labels em BOLD
+ *     Dados preenchidos em REGULAR
+ * - Ponto 5.1 e todo o conteúdo da Página 1 posicionados bem acima do rodapé (folga > 50mm)
+ * - Área de Instruções de Preenchimento/Nota removida conforme instrução
  */
 export const gerarPdfFormularioInscricao = async (
   dados: DadosInscricaoFormando
@@ -126,14 +132,14 @@ export const gerarPdfFormularioInscricao = async (
   const greenG = 128;
   const greenB = 38;
 
-  // Helper: Cabeçalho com Logo CFP-STP e Título
+  // Helper: Cabeçalho com EXCLUSIVAMENTE o Logo CFP-STP (Reduzido)
   const drawOfficialHeader = () => {
     const cx = pageWidth / 2; // 105mm
 
-    // 1. Logo do Cabeçalho = CFPSTP.svg (tamanho compacto ~11mm x 11mm)
+    // 1. Logo do Cabeçalho = CFPSTP.svg (tamanho compacto reduzido ~10mm x 10mm)
     if (logos.cfpStp) {
       try {
-        doc.addImage(logos.cfpStp, 'PNG', cx - 5.5, 10, 11, 11);
+        doc.addImage(logos.cfpStp, 'PNG', cx - 5, 9, 10, 10);
       } catch (_e) {
         // Fallback gráfico
       }
@@ -141,21 +147,21 @@ export const gerarPdfFormularioInscricao = async (
       doc.setDrawColor(greenR, greenG, greenB);
       doc.setFillColor(greenR, greenG, greenB);
       doc.setLineWidth(0.6);
-      doc.line(cx - 4, 11, cx, 14);
-      doc.line(cx, 14, cx + 4, 11);
+      doc.line(cx - 3.5, 10, cx, 13);
+      doc.line(cx, 13, cx + 3.5, 10);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.5);
-      doc.text('CFP-STP', cx, 16, { align: 'center' });
+      doc.setFontSize(4);
+      doc.text('CFP-STP', cx, 15, { align: 'center' });
     }
 
     // Título Institucional Oficial do Cabeçalho
     doc.setFont('times', 'bold');
-    doc.setFontSize(11.5);
+    doc.setFontSize(11);
     doc.setTextColor(greenR, greenG, greenB);
     doc.text(
       'CENTRO DE FORMAÇÃO PROFISSIONAL DE SÃO TOMÉ E PRÍNCIPE',
       cx,
-      25,
+      23.5,
       { align: 'center' }
     );
   };
@@ -163,58 +169,59 @@ export const gerarPdfFormularioInscricao = async (
   // Helper: Rodapé Institucional com Ordem Exata dos Logos:
   // Esquerda: República Portuguesa | Centro: IEFP | Direita: Cooperação Portuguesa
   const drawOfficialFooter = (paginaTexto: '1/2' | '2/2') => {
-    const footerLineY = 265;
-  
+    const footerLineY = 266;
+
+    // Linha superior do rodapé
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.25);
+    doc.line(marginL, footerLineY, rightEdge, footerLineY);
+
     // Indicador de Página
     doc.setFont('times', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(50, 60, 75);
+    doc.setFontSize(9);
+    doc.setTextColor(60, 70, 85);
     doc.text(`Página ${paginaTexto}`, marginL, footerLineY - 1.5);
-  
+
     const logoY = footerLineY + 2.5;
 
-    // 1. ESQUERDA: República Portuguesa (Republica protuguesa.svg)
+    // 1. ESQUERDA: República Portuguesa (Republica protuguesa.svg) - Reduzido e elegante (~18mm x 7.5mm)
     if (logos.republicaPortuguesa) {
       try {
-        doc.addImage(logos.republicaPortuguesa, 'PNG', marginL, logoY, 22, 9);
+        doc.addImage(logos.republicaPortuguesa, 'PNG', marginL, logoY, 18, 7.5);
       } catch (_e) {
         // Fallback
       }
-    } 
-    
-    
+    }
 
-    // 2. CENTRO: IEFP (IEFP__Logo_.svg)
+    // 2. CENTRO: IEFP (IEFP__Logo_.svg) - Reduzido e elegante (~16mm x 6.5mm)
     const midX = 105;
     if (logos.iefp) {
       try {
-        doc.addImage(logos.iefp, 'PNG', midX - 10, logoY, 20, 8);
+        doc.addImage(logos.iefp, 'PNG', midX - 8, logoY + 0.5, 16, 6.5);
       } catch (_e) {
         // Fallback
       }
-    } 
-    
+    }
 
-    // 3. DIREITA: Cooperação Portuguesa (cooperacao-prtuguesa.svg)
-    const cooperacaoLogoW = 18;
-const cooperacaoLogoH = 6.5;
+    // 3. DIREITA: Cooperação Portuguesa (cooperacao-prtuguesa.svg) - Reduzido (~15mm x 5.5mm)
+    const cooperacaoLogoW = 15;
+    const cooperacaoLogoH = 5.5;
+    const rightLogoX = rightEdge - cooperacaoLogoW;
 
-const rightLogoX = rightEdge - cooperacaoLogoW;
-
-if (logos.cooperacaoPortuguesa) {
-  try {
-    doc.addImage(
-      logos.cooperacaoPortuguesa,
-      'PNG',
-      rightLogoX,
-      logoY + 1,
-      cooperacaoLogoW,
-      cooperacaoLogoH
-    );
-  } catch (_e) {
-    // Fallback
-  }
-}
+    if (logos.cooperacaoPortuguesa) {
+      try {
+        doc.addImage(
+          logos.cooperacaoPortuguesa,
+          'PNG',
+          rightLogoX,
+          logoY + 1,
+          cooperacaoLogoW,
+          cooperacaoLogoH
+        );
+      } catch (_e) {
+        // Fallback
+      }
+    }
   };
 
   // Helper para desenhar a linha pautada e o valor preenchido (PESO REGULAR)
@@ -241,7 +248,7 @@ if (logos.cooperacaoPortuguesa) {
     if (value && value.trim()) {
       // DADOS PREENCHIDOS = PESO REGULAR
       doc.setFont('times', options?.bold ? 'bold' : 'normal');
-      doc.setFontSize(options?.fontSize || 11);
+      doc.setFontSize(options?.fontSize || 10.5);
       doc.setTextColor(tr, tg, tb);
       const maxW = Math.max(6, xEnd - xStart - 2);
       const textoCortado = doc.splitTextToSize(value.trim(), maxW)[0] || '';
@@ -254,7 +261,7 @@ if (logos.cooperacaoPortuguesa) {
     }
   };
 
-  // Helper para desenhar Rólos/Labels em PESO SEMIBOLD / BOLD
+  // Helper para desenhar Rótulos/Labels em PESO BOLD
   const drawLabel = (
     text: string,
     x: number,
@@ -262,7 +269,7 @@ if (logos.cooperacaoPortuguesa) {
     fontSize = 9,
     fontFamily: 'times' | 'helvetica' = 'times'
   ) => {
-    // LABELS = PESO SEMIBOLD/BOLD
+    // LABELS = PESO BOLD
     doc.setFont(fontFamily, 'bold');
     doc.setFontSize(fontSize);
     doc.setTextColor(0, 0, 0);
@@ -279,21 +286,21 @@ if (logos.cooperacaoPortuguesa) {
   const badgeW = 66;
   const badgeH = 5;
   const badgeX = (pageWidth - badgeW) / 2;
-  const badgeY = 29.5;
+  const badgeY = 27.5;
   doc.setFillColor(greenR, greenG, greenB);
   doc.rect(badgeX, badgeY, badgeW, badgeH, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.setTextColor(255, 255, 255);
   doc.text('FICHA DE INSCRIÇÃO DO FORMANDO', pageWidth / 2, badgeY + 3.6, {
     align: 'center',
   });
 
-  // Moldura da FOTO 3x4 (Direita) - Compacta (26mm x 32mm)
-  const photoX = rightEdge - 28;
-  const photoY = 36;
-  const photoW = 28;
-  const photoH = 34;
+  // Moldura da FOTO 3x4 (Direita) - Compacta (25mm x 31mm)
+  const photoX = rightEdge - 26;
+  const photoY = 34.5;
+  const photoW = 26;
+  const photoH = 31;
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.28);
   doc.rect(photoX, photoY, photoW, photoH);
@@ -315,13 +322,13 @@ if (logos.cooperacaoPortuguesa) {
       );
     } catch {
       doc.setFont('times', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(0, 0, 0);
       doc.text('FOTO 3x4', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
     }
   } else {
     doc.setFont('times', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(0, 0, 0);
     doc.text('FOTO 3x4', photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
   }
@@ -331,157 +338,124 @@ if (logos.cooperacaoPortuguesa) {
   const dataInsc = extrairPartesData(dados.data_inscricao);
   const numProc = obterNumeroProcesso(dados);
 
-  let y = 40.5;
-  drawLabel('N.º de Inscrição:', marginL, y, 9, 'helvetica');
+  let y = 38.5;
+  drawLabel('N.º de Inscrição:', marginL, y, 8.8, 'helvetica');
   doc.setTextColor(greenR, greenG, greenB);
-  drawUnderlinedValue(marginL + 30, marginL + 62, y + 0.4, seqNum, {
+  drawUnderlinedValue(marginL + 28, marginL + 60, y + 0.4, seqNum, {
     lineColor: [greenR, greenG, greenB],
     textColor: [15, 23, 42],
     align: 'center',
     bold: true,
   });
 
-  y += 7;
-  drawLabel('Data de Inscrição', marginL, y, 8.2, 'helvetica');
-  drawUnderlinedValue(marginL + 26, marginL + 36, y + 0.3, dataInsc.dia, {
+  y += 6.5;
+  drawLabel('Data de Inscrição', marginL, y, 8, 'helvetica');
+  drawUnderlinedValue(marginL + 25, marginL + 35, y + 0.3, dataInsc.dia, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
   });
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(greenR, greenG, greenB);
-  doc.text('/', marginL + 36.8, y);
-  drawUnderlinedValue(marginL + 38, marginL + 48, y + 0.3, dataInsc.mes, {
+  doc.text('/', marginL + 35.8, y);
+  drawUnderlinedValue(marginL + 37, marginL + 47, y + 0.3, dataInsc.mes, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
   });
-  doc.text('/', marginL + 48.8, y);
-  drawUnderlinedValue(marginL + 50, marginL + 62, y + 0.3, dataInsc.ano, {
+  doc.text('/', marginL + 47.8, y);
+  drawUnderlinedValue(marginL + 49, marginL + 60, y + 0.3, dataInsc.ano, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
   });
 
-  y += 7;
-  drawLabel('N.º DE PROCESSO:', marginL, y, 7.8, 'helvetica');
-  drawUnderlinedValue(marginL + 30, marginL + 62, y + 0.3, numProc, {
+  y += 6.5;
+  drawLabel('N.º DE PROCESSO:', marginL, y, 7.5, 'helvetica');
+  drawUnderlinedValue(marginL + 28, marginL + 60, y + 0.3, numProc, {
     lineColor: [greenR, greenG, greenB],
     align: 'center',
-    fontSize: 8.5,
+    fontSize: 8.2,
   });
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.2);
+  doc.setFontSize(7);
   doc.setTextColor(greenR, greenG, greenB);
-  doc.text('(seq/mês/ano)', marginL + 63.5, y);
+  doc.text('(seq/mês/ano)', marginL + 61.5, y);
 
   // Secção 1 - Identificação do Candidato
-  y = 66;
+  y = 63;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.8);
+  doc.setFontSize(9.5);
   doc.setTextColor(greenR, greenG, greenB);
   doc.text('1 - Identificação do Candidato:', marginL, y);
 
-  const lineStep = 8.7; // Espaçamento compacto reduzido para caber tudo folgadamente
-  y = 73;
+  const lineStep = 8.2; // Espaçamento compacto reduzido para caber tudo folgadamente
+  y = 69.5;
 
   // Nome:
-  let lx = drawLabel('Nome:', marginL, y, 9);
+  let lx = drawLabel('Nome:', marginL, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.nome);
 
   // Filiação: Pai
   y += lineStep;
-  lx = drawLabel('Filiação: Pai', marginL, y, 9);
+  lx = drawLabel('Filiação: Pai', marginL, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.nome_pai);
 
   // Mãe
   y += lineStep;
-  lx = drawLabel('Mãe', marginL + 12, y, 9);
+  lx = drawLabel('Mãe', marginL + 12, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.nome_mae);
 
   // N.º de B.I.: _____ Arq. Ident. _____
   y += lineStep;
-  lx = drawLabel('N.º de B.I.:', marginL, y, 9);
-  drawUnderlinedValue(lx, marginL + 72, y + 0.3, dados.bi);
-  lx = drawLabel('Arq. Ident.', marginL + 74, y, 9);
+  lx = drawLabel('N.º de B.I.:', marginL, y, 8.8);
+  drawUnderlinedValue(lx, marginL + 70, y + 0.3, dados.bi);
+  lx = drawLabel('Arq. Ident.', marginL + 72, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.arquivo_identificacao);
 
   // Nº de Identificação Fiscal _____
   y += lineStep;
-  lx = drawLabel('Nº de Identificação Fiscal', marginL, y, 9);
-  drawUnderlinedValue(lx, marginL + 76, y + 0.3, dados.nif);
+  lx = drawLabel('Nº de Identificação Fiscal', marginL, y, 8.8);
+  drawUnderlinedValue(lx, marginL + 74, y + 0.3, dados.nif);
 
   // Data de Nascimento ___/___/___. Sexo _____ Idade _____
   y += lineStep;
   const dn = extrairPartesData(dados.datanascimento);
-  lx = drawLabel('Data de Nascimento', marginL, y, 9);
+  lx = drawLabel('Data de Nascimento', marginL, y, 8.8);
 
-  drawUnderlinedValue(
-    lx,
-    lx + 9,
-    y + 0.3,
-    dn.dia,
-    { align: 'center' }
-  );
-  
+  drawUnderlinedValue(lx, lx + 9, y + 0.3, dn.dia, { align: 'center' });
   doc.text('/', lx + 9.5, y);
-  
-  drawUnderlinedValue(
-    lx + 11,
-    lx + 20,
-    y + 0.3,
-    dn.mes,
-    { align: 'center' }
-  );
-  
+  drawUnderlinedValue(lx + 11, lx + 20, y + 0.3, dn.mes, { align: 'center' });
   doc.text('/', lx + 20.5, y);
-  
-  // ANO — aumentar largura
-  drawUnderlinedValue(
-    lx + 22,
-    lx + 37,
-    y + 0.3,
-    dn.ano,
-    {
-      align: 'center',
-      fontSize: 9,
-    }
-  );
+  drawUnderlinedValue(lx + 22, lx + 37, y + 0.3, dn.ano, { align: 'center', fontSize: 8.8 });
 
-  lx = drawLabel('Sexo', lx + 34, y, 9);
+  lx = drawLabel('Sexo', lx + 34, y, 8.8);
   drawUnderlinedValue(lx, lx + 28, y + 0.3, dados.sexo);
 
-  lx = drawLabel('Idade', lx + 30, y, 9);
-  drawUnderlinedValue(
-    lx,
-    rightEdge,
-    y + 0.3,
-    dados.idade ? `${dados.idade} anos` : ''
-  );
+  lx = drawLabel('Idade', lx + 30, y, 8.8);
+  drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.idade ? `${dados.idade} anos` : '');
 
   // Nacionalidade: _____ Local de Nascimento _____
   y += lineStep;
-  lx = drawLabel('Nacionalidade:', marginL, y, 9);
-  drawUnderlinedValue(lx, marginL + 70, y + 0.3, dados.nacionalidade);
-  lx = drawLabel('Local de Nascimento', marginL + 72, y, 9);
+  lx = drawLabel('Nacionalidade:', marginL, y, 8.8);
+  drawUnderlinedValue(lx, marginL + 68, y + 0.3, dados.nacionalidade);
+  lx = drawLabel('Local de Nascimento', marginL + 70, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.naturalidade);
 
   // Estado Civil: _____ N.º pessoas do agregado familiar : _____
   y += lineStep;
-  lx = drawLabel('Estado Civil:', marginL, y, 9);
-  drawUnderlinedValue(lx, marginL + 70, y + 0.3, dados.estado_civil);
-  lx = drawLabel('N.º pessoas do agregado familiar :', marginL + 72, y, 9);
-  drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.agregado_familiar, {
-    align: 'center',
-  });
+  lx = drawLabel('Estado Civil:', marginL, y, 8.8);
+  drawUnderlinedValue(lx, marginL + 68, y + 0.3, dados.estado_civil);
+  lx = drawLabel('N.º pessoas do agregado familiar :', marginL + 70, y, 8.8);
+  drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.agregado_familiar, { align: 'center' });
 
   // Morada: _____ Distrito: _____
   y += lineStep;
-  lx = drawLabel('Morada:', marginL, y, 9);
-  drawUnderlinedValue(lx, marginL + 98, y + 0.3, dados.morada);
-  lx = drawLabel('Distrito:', marginL + 100, y, 9);
+  lx = drawLabel('Morada:', marginL, y, 8.8);
+  drawUnderlinedValue(lx, marginL + 96, y + 0.3, dados.morada);
+  lx = drawLabel('Distrito:', marginL + 98, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.distrito);
 
   // Contacto telefónico: _____
   y += lineStep;
-  lx = drawLabel('Contacto telefónico:', marginL, y, 9);
+  lx = drawLabel('Contacto telefónico:', marginL, y, 8.8);
   const contactosTexto = [
     dados.telefone,
     dados.telefone2 ? `Alt: ${dados.telefone2}` : '',
@@ -493,16 +467,22 @@ if (logos.cooperacaoPortuguesa) {
 
   // Ocupação: _____
   y += lineStep;
-  lx = drawLabel('Ocupação:', marginL, y, 9);
+  lx = drawLabel('Ocupação:', marginL, y, 8.8);
   drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.ocupacao);
 
-  // 2 –Habilitações Literárias (concluídas) : _____
-  y += 9.5;
-  drawLabel('2 –Habilitações Literárias', marginL, y, 9.8);
+  // 2 –Habilitações Literárias (concluídas) : _____ (Com área em parênteses se não ultrapassar a linha)
+  y += 9;
+  drawLabel('2 –Habilitações Literárias', marginL, y, 9.2);
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
-  doc.text('(concluídas) :', marginL + 44, y);
-  drawUnderlinedValue(marginL + 65, rightEdge, y + 0.3, dados.habilitacao);
+  doc.setFontSize(8.8);
+  doc.text('(concluídas) :', marginL + 42, y);
+
+  const areaFormacao = dados.habilitacao_area?.trim();
+  const habilitaTextoCompleto = areaFormacao
+    ? `${dados.habilitacao} (${areaFormacao})`
+    : dados.habilitacao;
+
+  drawUnderlinedValue(marginL + 63, rightEdge, y + 0.3, habilitaTextoCompleto);
 
   // Helper para desenhar parágrafos pautados
   const drawRuledParagraph = (
@@ -512,7 +492,7 @@ if (logos.cooperacaoPortuguesa) {
   ): number => {
     const fullW = rightEdge - marginL;
     doc.setFont('times', 'normal');
-    doc.setFontSize(8.8);
+    doc.setFontSize(8.5);
     const linhasTexto = textValue?.trim()
       ? doc.splitTextToSize(textValue.trim(), fullW - 4)
       : [];
@@ -520,56 +500,56 @@ if (logos.cooperacaoPortuguesa) {
     let curY = yFirstLine;
     for (let i = 0; i < numLines; i++) {
       drawUnderlinedValue(marginL, rightEdge, curY, linhasTexto[i] || '');
-      curY += 6;
+      curY += 5.8;
     }
     return curY;
   };
 
   // 3 –Formação Profissional (2 linhas)
-  y += 9;
-  drawLabel('3 –Formação Profissional', marginL, y, 9.8);
+  y += 8.5;
+  drawLabel('3 –Formação Profissional', marginL, y, 9.2);
   doc.setFont('times', 'normal');
-  doc.setFontSize(7.8);
+  doc.setFontSize(7.5);
   doc.setTextColor(80, 80, 80);
   doc.text(
     '(Se já frequentou algum Curso de formação diga o curso, local , duração e data conclusão)',
-    marginL + 42,
+    marginL + 40,
     y
   );
-  y = drawRuledParagraph(y + 5.5, 2, dados.formacao_profissional);
+  y = drawRuledParagraph(y + 5, 2, dados.formacao_profissional);
 
   // 4- Experiência Profissional (2 linhas)
-  y += 3.5;
-  drawLabel('4- Experiência Profissional', marginL, y, 9.8);
+  y += 3;
+  drawLabel('4- Experiência Profissional', marginL, y, 9.2);
   doc.setFont('times', 'normal');
-  doc.setFontSize(7.8);
+  doc.setFontSize(7.5);
   doc.setTextColor(80, 80, 80);
   doc.text(
     '(Se já trabalhou refira local de trabalho, funções exercidas e tempo de serviço).',
-    marginL + 44,
+    marginL + 42,
     y
   );
-  y = drawRuledParagraph(y + 5.5, 3, dados.experiencia_profissional);
+  y = drawRuledParagraph(y + 5, 2, dados.experiencia_profissional);
 
   // 5- Motivo da Inscrição no Centro de Formação: (2 linhas)
-  y += 3.5;
-  drawLabel('5- Motivo da Inscrição no Centro de Formação:', marginL, y, 9.8);
+  y += 3;
+  drawLabel('5- Motivo da Inscrição no Centro de Formação:', marginL, y, 9.2);
   doc.setFont('times', 'bold');
-  doc.setFontSize(7.8);
+  doc.setFontSize(7.5);
   doc.setTextColor(180, 40, 40);
-  doc.text('(preenchimento obrigatório)', marginL + 76, y);
-  y = drawRuledParagraph(y + 5.5, 2, dados.motivo_inscricao);
+  doc.text('(preenchimento obrigatório)', marginL + 72, y);
+  y = drawRuledParagraph(y + 5, 2, dados.motivo_inscricao);
 
   // 5.1 Curso ou área de formação pretendida pelo Candidato
-  y += 4.5;
-  drawLabel('5.1 Curso ou área de formação pretendida pelo Candidato', marginL, y, 9.8);
+  y += 4;
+  drawLabel('5.1 Curso ou área de formação pretendida pelo Candidato', marginL, y, 9.2);
   doc.setFont('times', 'bold');
-  doc.setFontSize(7.8);
+  doc.setFontSize(7.5);
   doc.setTextColor(180, 40, 40);
-  doc.text('(preenchimento obrigatório)', marginL + 92, y);
+  doc.text('(preenchimento obrigatório)', marginL + 88, y);
 
-  y += 5.5;
-  lx = drawLabel('1ª Opção', marginL, y, 9);
+  y += 5;
+  lx = drawLabel('1ª Opção', marginL, y, 8.8);
   const textoOpcao1 = dados.curso_nome
     ? `${dados.curso_nome}${dados.programa_nome ? ` — ${dados.programa_nome}` : ''}${
         dados.curso_local ? ` (${dados.curso_local})` : ''
@@ -577,8 +557,8 @@ if (logos.cooperacaoPortuguesa) {
     : '';
   drawUnderlinedValue(lx, rightEdge, y + 0.3, textoOpcao1);
 
-  y += 5.5;
-  lx = drawLabel('2ª Opção', marginL, y, 9);
+  y += 5;
+  lx = drawLabel('2ª Opção', marginL, y, 8.8);
   const textoOpcao2 = dados.curso_opcao_2_nome
     ? `${dados.curso_opcao_2_nome}${
         dados.curso_opcao_2_programa ? ` — ${dados.curso_opcao_2_programa}` : ''
@@ -586,7 +566,7 @@ if (logos.cooperacaoPortuguesa) {
     : '';
   drawUnderlinedValue(lx, rightEdge, y + 0.3, textoOpcao2);
 
-  // O PONTO 5.1 TERMINA AQUI (y ~ 212mm), MAIS DE 50mm ANTES DO RODAPÉ!
+  // O PONTO 5.1 TERMINA AQUI (y ~ 212mm), COM MAIS DE 50mm DE FOLGA TOTALMENTE LIVRES ANTES DO RODAPÉ (266mm)!
   drawOfficialFooter('1/2');
 
   // ============================================================================
@@ -596,9 +576,9 @@ if (logos.cooperacaoPortuguesa) {
   drawOfficialHeader();
 
   // Título Sublinhado: A PREENCHER PELOS SERVIÇOS
-  let y2 = 40;
+  let y2 = 38;
   doc.setFont('times', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.8);
   doc.setTextColor(0, 0, 0);
   const tituloServicos = 'A PREENCHER PELOS SERVIÇOS';
   doc.text(tituloServicos, pageWidth / 2, y2, { align: 'center' });
@@ -617,9 +597,9 @@ if (logos.cooperacaoPortuguesa) {
     boxW = 6,
     boxH = 3
   ) => {
-    // LABELS EM PESO SEMIBOLD/BOLD
+    // LABELS EM PESO BOLD
     doc.setFont('times', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.8);
     doc.setTextColor(0, 0, 0);
     doc.text(labelLeft, xStartText, yRow);
 
@@ -648,8 +628,8 @@ if (logos.cooperacaoPortuguesa) {
   };
 
   // 6 – Situação do Candidato perante o Emprego
-  y2 = 49;
-  drawLabel('6 – Situação do Candidato perante o Emprego', marginL, y2, 10);
+  y2 = 47;
+  drawLabel('6 – Situação do Candidato perante o Emprego', marginL, y2, 9.5);
 
   const sitEmp = (dados.situacao_emprego || '').toLowerCase();
   const isPrimeiroEmprego =
@@ -663,9 +643,9 @@ if (logos.cooperacaoPortuguesa) {
   const isEstudante = sitEmp.includes('estudante');
 
   // 1. Candidato à Procura do 1º Emprego
-  y2 += 4.8;
+  y2 += 4.5;
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.text('1.', marginL, y2);
   drawDottedCheckboxRow(
     'Candidato à Procura do 1º Emprego',
@@ -675,9 +655,9 @@ if (logos.cooperacaoPortuguesa) {
   );
 
   // 2. Desempregado à procura de Novo Emprego
-  y2 += 4.5;
+  y2 += 4.2;
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.text('2.', marginL, y2);
   drawDottedCheckboxRow(
     'Desempregado à procura de Novo Emprego',
@@ -687,22 +667,22 @@ if (logos.cooperacaoPortuguesa) {
   );
 
   // Actividade profissional anterior : _____
-  y2 += 4.5;
-  lx = drawLabel('Actividade profissional anterior :', marginL + 6, y2, 8.5);
+  y2 += 4.2;
+  lx = drawLabel('Actividade profissional anterior :', marginL + 6, y2, 8.2);
   const ativAnterior =
     dados.atividade_profissional_anterior ||
     (isNovoEmprego ? dados.experiencia_profissional || dados.ocupacao : '');
-  drawUnderlinedValue(lx, rightEdge - 15, y2 + 0.3, ativAnterior, { fontSize: 8.2 });
+  drawUnderlinedValue(lx, rightEdge - 15, y2 + 0.3, ativAnterior, { fontSize: 8 });
 
   // 3. Empregado/Activo
-  y2 += 4.5;
+  y2 += 4.2;
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.text('3.', marginL, y2);
   drawDottedCheckboxRow('Empregado/Activo', marginL + 6, y2, isEmpregadoActivo);
 
   // Empregado com horário reduzido
-  y2 += 4.5;
+  y2 += 4.2;
   drawDottedCheckboxRow(
     'Empregado com horário reduzido',
     marginL + 6,
@@ -711,49 +691,49 @@ if (logos.cooperacaoPortuguesa) {
   );
 
   // Função que exerce : _____ desde _____
-  y2 += 4.5;
-  lx = drawLabel('Função que exerce :', marginL + 6, y2, 8.5);
+  y2 += 4.2;
+  lx = drawLabel('Função que exerce :', marginL + 6, y2, 8.2);
   const funcaoVal =
     dados.funcao_exerce ||
     (isEmpregadoActivo || isHorarioReduzido ? dados.ocupacao : '');
-  drawUnderlinedValue(lx, marginL + 90, y2 + 0.3, funcaoVal, { fontSize: 8.2 });
+  drawUnderlinedValue(lx, marginL + 88, y2 + 0.3, funcaoVal, { fontSize: 8 });
 
-  lx = drawLabel('desde', marginL + 92, y2, 8.5);
+  lx = drawLabel('desde', marginL + 90, y2, 8.2);
   drawUnderlinedValue(lx, rightEdge - 15, y2 + 0.3, dados.funcao_desde || '', {
-    fontSize: 8.2,
+    fontSize: 8,
     align: 'center',
   });
 
   // 4. Profissão _____
-  y2 += 4.5;
+  y2 += 4.2;
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.text('4.', marginL, y2);
-  lx = drawLabel('Profissão', marginL + 6, y2, 9);
+  lx = drawLabel('Profissão', marginL + 6, y2, 8.8);
   drawUnderlinedValue(
     lx,
     rightEdge - 15,
     y2 + 0.3,
     dados.profissao || (!isEstudante ? dados.ocupacao : ''),
-    { fontSize: 8.5 }
+    { fontSize: 8.2 }
   );
 
   // 5. Estudante
-  y2 += 4.5;
+  y2 += 4.2;
   doc.setFont('times', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.8);
   doc.text('5.', marginL, y2);
   drawDottedCheckboxRow('Estudante', marginL + 6, y2, isEstudante);
 
   // Nível de Escolaridade.......
-  y2 += 4.5;
-  lx = drawLabel('Nível de Escolaridade', marginL + 6, y2, 8.5);
+  y2 += 4.2;
+  lx = drawLabel('Nível de Escolaridade', marginL + 6, y2, 8.2);
   doc.setLineDashPattern([0.4, 1.1], 0);
   doc.line(lx, y2 - 0.2, rightEdge - 15, y2 - 0.2);
   doc.setLineDashPattern([], 0);
   if (dados.habilitacao) {
     doc.setFont('times', 'normal');
-    doc.setFontSize(8.2);
+    doc.setFontSize(8);
     doc.text(
       doc.splitTextToSize(dados.habilitacao, 85)[0] || '',
       lx + 2,
@@ -762,54 +742,54 @@ if (logos.cooperacaoPortuguesa) {
   }
 
   // 7- Casos Especiais:
-  y2 = 101;
-  drawLabel('7- Casos Especiais:', marginL, y2, 10);
+  y2 = 96;
+  drawLabel('7- Casos Especiais:', marginL, y2, 9.5);
   doc.setFont('times', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(180, 40, 40);
-  doc.text('(preenchimento obrigatório)', marginL + 33, y2);
+  doc.text('(preenchimento obrigatório)', marginL + 32, y2);
 
-  y2 += 4.5;
-  lx = drawLabel('Deficiente', marginL, y2, 8.5);
+  y2 += 4.2;
+  lx = drawLabel('Deficiente', marginL, y2, 8.2);
   drawUnderlinedValue(
     lx,
     lx + 12,
     y2 + 0.3,
     dados.possui_caso_especial === 'Sim' ? 'Sim' : 'Não',
-    { align: 'center', fontSize: 8.2 }
+    { align: 'center', fontSize: 8 }
   );
 
-  lx = drawLabel(', Encaminhado por Instituição de Apoio Social :', lx + 14, y2, 8.5);
+  lx = drawLabel(', Encaminhado por Instituição de Apoio Social :', lx + 14, y2, 8.2);
   drawUnderlinedValue(
     lx,
     lx + 12,
     y2 + 0.3,
     dados.encaminhado_apoio_social || 'Não',
-    { align: 'center', fontSize: 8.2 }
+    { align: 'center', fontSize: 8 }
   );
 
-  lx = drawLabel('Qual:', lx + 14, y2, 8.5);
+  lx = drawLabel('Qual:', lx + 14, y2, 8.2);
   const qualCasoTexto =
     dados.instituicao_apoio_social ||
     (dados.possui_caso_especial === 'Sim' ? dados.casos_especiais : '');
   drawUnderlinedValue(lx, rightEdge, y2 + 0.3, qualCasoTexto, {
-    fontSize: 8.2,
+    fontSize: 8,
   });
 
-  y2 += 4.5;
-  lx = drawLabel('Encaminhado por outra instituição: Qual', marginL, y2, 8.5);
+  y2 += 4.2;
+  lx = drawLabel('Encaminhado por outra instituição: Qual', marginL, y2, 8.2);
   drawUnderlinedValue(
     lx,
     rightEdge,
     y2 + 0.3,
     dados.encaminhado_outra_instituicao || '',
-    { fontSize: 8.2 }
+    { fontSize: 8 }
   );
 
   // SITUAÇÃO DA CANDIDATURA
-  y2 = 128;
+  y2 = 122;
   doc.setFont('times', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
   const tituloSitCand = 'SITUAÇÃO DA CANDIDATURA';
   doc.text(tituloSitCand, pageWidth / 2, y2, { align: 'center' });
@@ -819,8 +799,8 @@ if (logos.cooperacaoPortuguesa) {
   doc.line((pageWidth - wSit) / 2, y2 + 0.8, (pageWidth + wSit) / 2, y2 + 0.8);
 
   // 8 – O candidato ficou inscrito no CURSO: _____
-  y2 = 140;
-  lx = drawLabel('8 – O candidato ficou inscrito no CURSO:', marginL, y2, 9.8);
+  y2 = 133;
+  lx = drawLabel('8 – O candidato ficou inscrito no CURSO:', marginL, y2, 9.2);
 
   const cursoInscritoLinha1 = dados.curso_nome || '';
   const cursoInscritoLinha2 = [
@@ -832,16 +812,16 @@ if (logos.cooperacaoPortuguesa) {
     .join('   ·   ');
 
   drawUnderlinedValue(lx, rightEdge, y2 + 0.3, cursoInscritoLinha1, {
-    fontSize: 9,
+    fontSize: 8.8,
   });
-  y2 += 5.5;
+  y2 += 5;
   drawUnderlinedValue(marginL + 20, rightEdge, y2 + 0.3, cursoInscritoLinha2, {
-    fontSize: 8.5,
+    fontSize: 8.2,
   });
 
   // PROGRAMA
-  y2 = 154;
-  drawLabel('PROGRAMA', marginL, y2, 9.8);
+  y2 = 146;
+  drawLabel('PROGRAMA', marginL, y2, 9.2);
 
   const listaProgramasOficiais: Array<{
     label: string;
@@ -863,20 +843,20 @@ if (logos.cooperacaoPortuguesa) {
     { label: 'OUTROS', chave: 'OUTROS' },
   ];
 
-  y2 += 4.2;
+  y2 += 4;
   listaProgramasOficiais.forEach((itemProg) => {
     const marcado = verificarProgramaSelecionado(dados, itemProg.chave);
     drawDottedCheckboxRow(itemProg.label, marginL, y2, marcado, rightEdge - 8, 6, 2.8);
-    y2 += 4.0;
+    y2 += 3.8;
   });
 
   // 9. – Caso seja selecionado, permitirá que seus dados sejam divulgados?
-  y2 = 191;
+  y2 = 181;
   lx = drawLabel(
     '9. – Caso seja selecionado, permitirá que seus dados sejam divulgados? Sim',
     marginL,
     y2,
-    8.5
+    8.2
   );
   const autorizaSim = (dados.autoriza_divulgacao_dados || 'Sim') === 'Sim';
   drawUnderlinedValue(
@@ -887,7 +867,7 @@ if (logos.cooperacaoPortuguesa) {
     { align: 'center', bold: true }
   );
 
-  lx = drawLabel('Não', lx + 12, y2, 8.5);
+  lx = drawLabel('Não', lx + 12, y2, 8.2);
   drawUnderlinedValue(
     lx,
     lx + 10,
@@ -897,43 +877,15 @@ if (logos.cooperacaoPortuguesa) {
   );
 
   // Recebido por & Assinatura do Candidato(a)
-  y2 = 203;
-  drawLabel('Recebido por: :................................................', marginL, y2, 8.5);
-  drawLabel('Assinatura do Candidato(a)', rightEdge - 48, y2, 8.5);
+  y2 = 195;
+  drawLabel('Recebido por: :................................................', marginL, y2, 8.2);
+  drawLabel('Assinatura do Candidato(a)', rightEdge - 48, y2, 8.2);
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.25);
   doc.line(rightEdge - 52, y2 + 8, rightEdge - 5, y2 + 8);
 
-  // Linha divisória inferior antes da Nota
-  y2 = 217;
-  doc.setDrawColor(140, 140, 140);
-  doc.setLineWidth(0.2);
-  doc.line(marginL, y2, rightEdge, y2);
-
-  // Nota obrigatória
-  y2 = 223;
-  doc.setFont('times', 'bold');
-  doc.setFontSize(7.2);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Nota:', marginL, y2);
-  doc.setFont('times', 'normal');
-  doc.text('Deve-se anexar à ficha de inscrição,', marginL + 7, y2);
-  doc.setFont('times', 'bold');
-  doc.text('OBRIGATÓRIAMENTE,', marginL + 45, y2);
-  doc.setFont('times', 'normal');
-  doc.text(
-    'a fotocópia do Bilhete de Identidade e fotocópia de Cartão de Identificação Fiscal e cópia',
-    marginL + 73,
-    y2
-  );
-  doc.text(
-    'Certificado de Habilitações Literárias(autenticada) e carta ou declaração de serviço para inscritos que trabalham.',
-    marginL,
-    y2 + 3.8
-  );
-
-  // Rodapé da Página 2 (bem separado da Nota)
+  // Rodapé da Página 2 (Sem a Área de Instruções de Preenchimento / Nota conforme instrução)
   drawOfficialFooter('2/2');
 
   // Guardar e descarregar o PDF

@@ -13,7 +13,6 @@ import {
   Eye,
   Camera,
   FileText,
-  Sparkles,
   ShieldCheck,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -26,8 +25,6 @@ import { CameraCaptureModal } from '../../../components/InscricaoOnline/CameraCa
 import { FieldTooltip } from './FieldTooltip';
 import {
   DISTRITOS_PERMITIDOS,
-  ESTADOS_CIVIS_PERMITIDOS,
-  SITUACOES_EMPREGO,
   ARQUIVOS_IDENTIFICACAO,
 } from '../../../data/cursosData';
 
@@ -38,6 +35,27 @@ interface FormularioCandidaturaPublicaProps {
   aoNotificar: (msg: { tipo: 'sucesso' | 'erro'; texto: string } | null) => void;
   aoIrParaConsulta: (codigoOuBi: string) => void;
 }
+
+const OPCOES_HABILITACAO_LITERARIA = [
+  '1.ª Classe',
+  '2.ª Classe',
+  '3.ª Classe',
+  '4.ª Classe',
+  '5.ª Classe',
+  '6.ª Classe',
+  '7.ª Classe',
+  '8.ª Classe',
+  '9.ª Classe',
+  '10.ª Classe',
+  '11.ª Classe',
+  '12.ª Classe',
+  'Bacharelato',
+  'Licenciatura',
+  'Pós-Graduação',
+  'Mestrado',
+  'Doutoramento',
+  'Outra',
+];
 
 export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublicaProps> = ({
   programas,
@@ -108,31 +126,27 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     if (cursoPreSelecionado) {
       const progId = Number(cursoPreSelecionado.fk_programa || cursoPreSelecionado.programa_id || 1);
       const cursoId = Number(cursoPreSelecionado.id || cursoPreSelecionado.ID);
-      const outrosCursos = cursos.filter(
-        (c) => Number(c.id || c.ID) !== cursoId && Number(c.fk_programa || c.programa_id) === progId
-      );
-      const c2 = outrosCursos[0] || cursos.find((c) => Number(c.id || c.ID) !== cursoId);
 
       setFormData((prev) => ({
         ...prev,
         programa_id: progId,
         curso_opcao1_id: cursoId,
-        curso_opcao2_id: c2 ? Number(c2.id || c2.ID) : 0,
+        curso_opcao2_id: 0, // Opção 2 não é autopreenchida por padrão
       }));
     }
-  }, [cursoPreSelecionado, cursos]);
+  }, [cursoPreSelecionado]);
 
+  // Ao alterar o programa, ajusta curso_opcao1_id para o primeiro curso do programa e ZERA a opcao2!
   const handleProgramaChange = (novoProgramaId: number) => {
     const cursosDoPrograma = cursos.filter(
       (c) => Number(c.fk_programa || c.programa_id) === Number(novoProgramaId)
     );
     const primeiroCurso = cursosDoPrograma[0];
-    const segundoCurso = cursosDoPrograma[1];
     setFormData((prev) => ({
       ...prev,
       programa_id: novoProgramaId,
       curso_opcao1_id: primeiroCurso ? Number(primeiroCurso.id || primeiroCurso.ID) : 0,
-      curso_opcao2_id: segundoCurso ? Number(segundoCurso.id || segundoCurso.ID) : 0,
+      curso_opcao2_id: 0, // Não autopreenche opção 2 (já que não é obrigatória)
     }));
   };
 
@@ -183,13 +197,18 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     if (!formData.motivo_inscricao.trim()) novosErros.motivo_inscricao = true;
     if (!formData.autorizacao_divulgacao_dados) novosErros.autorizacao_divulgacao_dados = true;
 
+    // Fotografia é ESTRITAMENTE OBRIGATÓRIA
+    if (!fotoPreview && !fileFoto) {
+      novosErros.foto = true;
+    }
+
     setErrosCampos(novosErros);
 
     if (Object.keys(novosErros).length > 0) {
       Swal.fire({
         icon: 'warning',
         title: 'Campos Obrigatórios em Falta!',
-        text: 'Por favor, preencha todos os campos obrigatórios destacados a cor vermelha no formulário para prosseguir com a candidatura.',
+        text: 'Por favor, preencha todos os campos obrigatórios e carregue a Fotografia Tipo Passe para prosseguir com a candidatura.',
         confirmButtonText: 'Corrigir Campos Assinalados',
         confirmButtonColor: '#dc2626',
         customClass: {
@@ -213,6 +232,13 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     Object.entries(formData).forEach(([k, v]) => {
       payload.append(k, String(v));
     });
+
+    // Mapeamento específico de variáveis solicitadas
+    payload.append('arquivo_identificacao', formData.arquivo_identificacao || '');
+    payload.append('Arquivo de Identificação', formData.arquivo_identificacao || '');
+    payload.append('area_formacao', formData.habilitacao_area || '');
+    payload.append('Área de Formação', formData.habilitacao_area || '');
+
     if (fotoPreview) {
       payload.append('fotoPreview', fotoPreview);
     }
@@ -318,6 +344,14 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
   );
   const listaCursosExibida = cursosFiltrados.length > 0 ? cursosFiltrados : safeCursos;
 
+  // Opções de Estado Civil ajustadas ao Sexo selecionado
+  const opcoesEstadoCivil =
+    formData.sexo === 'Masculino'
+      ? ['Solteiro', 'Casado', 'Divorciado', 'Viúvo']
+      : formData.sexo === 'Feminino'
+      ? ['Solteira', 'Casada', 'Divorciada', 'Viúva']
+      : ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)'];
+
   return (
     <div className="space-y-6">
       {/* Banner Institucional Verde CFP-STP */}
@@ -331,11 +365,11 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
               Formulário Oficial de Candidatura ao CFP-STP
             </h2>
             <p className="mt-2 text-sm text-emerald-100/90 leading-relaxed">
-              Preencha com atenção os seus dados pessoais, selecione as suas opções de formação e anexe os documentos requeridos. Ao submeter,{' '}
+              Preencha com atenção os seus dados pessoais, selecione as suas opções de formação e carregue a sua fotografia tipo passe.{' '}
               <strong className="text-white">
-                receberá imediatamente a Ficha de Inscrição Oficial preenchida em PDF (2 páginas)
+                Ao submeter, receberá imediatamente a Ficha de Inscrição Oficial em PDF (2 páginas A4)
               </strong>{' '}
-              com o seu código oficial de candidatura e número de processo.
+              com o seu código oficial de candidatura.
             </p>
           </div>
 
@@ -353,7 +387,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
               <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold inline-flex items-center justify-center text-[11px]">
                 2
               </span>
-              <span>Cursos e Documentos</span>
+              <span>Cursos e Fotografia Passe</span>
             </div>
             <div className="flex items-center gap-2 text-emerald-100">
               <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold inline-flex items-center justify-center text-[11px]">
@@ -433,16 +467,6 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                 Exportar Excel (.xlsx)
               </button>
 
-              <a
-                href={`/api/candidaturas/${candidaturaRecemCriada.id}/ficha-inscricao?download=true`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-3 border border-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl font-semibold text-xs transition-all"
-              >
-                <FileText className="w-4 h-4" />
-                PDF do Servidor
-              </a>
-
               <button
                 type="button"
                 onClick={() => setMostrarFicha2Paginas(true)}
@@ -456,1019 +480,927 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
         </div>
       )}
 
-      {/* Layout Responsivo em 2 Colunas: Formulário Principal + Painel de Validação em Tempo Real */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* Coluna do Formulário (8 colunas) */}
-        <div className="xl:col-span-8 space-y-6">
-          <form
-            onSubmit={handleSubmissaoPublica}
-            className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 md:p-8 space-y-8"
-          >
-            {/* 1. Identificação do Candidato */}
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
-                <User className="w-5 h-5 text-emerald-700" />
-                1. Identificação do Candidato (Página 1 da Ficha Oficial)
-              </h3>
+      {/* Formulário Principal */}
+      <div className="w-full">
+        <form
+          onSubmit={handleSubmissaoPublica}
+          className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 md:p-8 space-y-8"
+        >
+          {/* 1. Identificação do Candidato */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <User className="w-5 h-5 text-emerald-700" />
+              1. Identificação do Candidato (Página 1 da Ficha Oficial)
+            </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-                <div className="md:col-span-2">
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Nome Completo *</span>
-                    <FieldTooltip
-                      title="Nome Completo"
-                      content="Escreva o seu nome completo rigorosamente igual ao registado no seu Bilhete de Identidade ou Passaporte."
-                    />
-                  </label>
-                  <input
-                    id="campo-nome"
-                    type="text"
-                    required
-                    placeholder="Nome completo conforme o Bilhete de Identidade"
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    className={getInputStyle('nome')}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+              <div className="md:col-span-2">
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Nome Completo *</span>
+                  <FieldTooltip
+                    title="Nome Completo"
+                    content="Escreva o seu nome completo rigorosamente igual ao registado no seu Bilhete de Identidade ou Passaporte."
                   />
-                  {fieldHasError('nome') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Nome completo é obrigatório.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Filiação — Nome do Pai</span>
-                    <FieldTooltip
-                      title="Filiação Paterna"
-                      content="Nome do pai conforme a sua certidão de nascimento ou bilhete de identidade."
-                    />
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nome completo do pai"
-                    value={formData.nome_pai}
-                    onChange={(e) => setFormData({ ...formData, nome_pai: e.target.value })}
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Filiação — Nome da Mãe</span>
-                    <FieldTooltip
-                      title="Filiação Materna"
-                      content="Nome da mãe conforme a sua certidão de nascimento ou bilhete de identidade."
-                    />
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nome completo da mãe"
-                    value={formData.nome_mae}
-                    onChange={(e) => setFormData({ ...formData, nome_mae: e.target.value })}
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Bilhete de Identidade (BI) *</span>
-                    <FieldTooltip
-                      title="Número do Documento (BI)"
-                      content="Número do Bilhete de Identidade, Passaporte ou Cédula Pessoal. Este número gerará o seu Processo de Formando Oficial (CFP{BI})."
-                    />
-                  </label>
-                  <input
-                    id="campo-bi"
-                    type="text"
-                    required
-                    placeholder="Ex: 145892STP"
-                    value={formData.bi}
-                    onChange={(e) => setFormData({ ...formData, bi: e.target.value })}
-                    className={getInputStyle('bi')}
-                  />
-                  {fieldHasError('bi') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Número de BI é obrigatório.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Arquivo de Identificação</span>
-                    <FieldTooltip
-                      title="Arquivo de Identificação"
-                      content="Repartição ou Conservatória do Registo Civil onde o seu documento foi emitido (ex.: São Tomé, Príncipe ou Arquivo Central)."
-                    />
-                  </label>
-                  <select
-                    value={formData.arquivo_identificacao}
-                    onChange={(e) =>
-                      setFormData({ ...formData, arquivo_identificacao: e.target.value })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
-                  >
-                    {ARQUIVOS_IDENTIFICACAO.map((arq) => (
-                      <option key={arq} value={arq}>
-                        {arq}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>NIF (Contribuinte)</span>
-                    <FieldTooltip
-                      title="NIF — Número de Identificação Fiscal"
-                      content="Número fiscal de 9 dígitos atribuído pela Direção de Impostos de São Tomé e Príncipe. Importante para credenciação e estágios remunerados."
-                    />
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: 210495821"
-                    value={formData.nif}
-                    onChange={(e) => setFormData({ ...formData, nif: e.target.value })}
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Data de Nascimento *</span>
-                    <FieldTooltip
-                      title="Idade Mínima"
-                      content="A idade mínima regulamentar para admissão aos cursos de formação inicial é de 16 anos completos."
-                    />
-                  </label>
-                  <input
-                    id="campo-data-nascimento"
-                    type="date"
-                    required
-                    value={formData.data_nascimento}
-                    onChange={(e) =>
-                      setFormData({ ...formData, data_nascimento: e.target.value })
-                    }
-                    className={getInputStyle('data_nascimento')}
-                  />
-                  {fieldHasError('data_nascimento') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Data de nascimento é obrigatória.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Sexo *</label>
-                  <select
-                    id="campo-sexo"
-                    required
-                    value={formData.sexo}
-                    onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
-                    className={getInputStyle('sexo')}
-                  >
-                    <option value="">Selecione o sexo...</option>
-                    <option value="Masculino">Masculino</option>
-                    <option value="Feminino">Feminino</option>
-                  </select>
-                  {fieldHasError('sexo') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Seleção do sexo é obrigatória.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Estado Civil
-                  </label>
-                  <select
-                    value={formData.estado_civil}
-                    onChange={(e) =>
-                      setFormData({ ...formData, estado_civil: e.target.value })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
-                  >
-                    <option value="">Selecione o estado civil...</option>
-                    {ESTADOS_CIVIS_PERMITIDOS.map((ec) => (
-                      <option key={ec} value={ec}>
-                        {ec}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Nacionalidade
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.nacionalidade}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nacionalidade: e.target.value })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Naturalidade / Agregado</span>
-                    <FieldTooltip
-                      title="Naturalidade e Agregado"
-                      content="Local de nascimento e número de pessoas que coabitam no mesmo domicílio familiar."
-                    />
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                    <input
-                      type="text"
-                      placeholder="Naturalidade"
-                      value={formData.naturalidade}
-                      onChange={(e) =>
-                        setFormData({ ...formData, naturalidade: e.target.value })
-                      }
-                      className="col-span-2 border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      max={25}
-                      title="Nº de pessoas no agregado familiar"
-                      value={formData.agregado}
-                      onChange={(e) =>
-                        setFormData({ ...formData, agregado: e.target.value })
-                      }
-                      className="border border-slate-300 rounded-lg p-2.5 text-xs text-center focus:outline-none focus:border-emerald-700"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Contacto e Morada */}
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
-                <MapPin className="w-5 h-5 text-emerald-700" />
-                2. Contacto, Morada e Distrito
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Distrito de Residência *</span>
-                    <FieldTooltip
-                      title="Distrito"
-                      content="Distrito de residência habitual para fins de alocação de transporte ou centro formativo."
-                    />
-                  </label>
-                  <select
-                    id="campo-distrito"
-                    required
-                    value={formData.distrito}
-                    onChange={(e) => setFormData({ ...formData, distrito: e.target.value })}
-                    className={getInputStyle('distrito')}
-                  >
-                    <option value="">Selecione o distrito...</option>
-                    {DISTRITOS_PERMITIDOS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                  {fieldHasError('distrito') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Distrito é obrigatório.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Morada / Localidade
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Budo Budo, Riboque, Madre Deus, Trindade..."
-                    value={formData.morada}
-                    onChange={(e) =>
-                      setFormData({ ...formData, morada: e.target.value, zona: e.target.value })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Telefone Principal *</span>
-                    <FieldTooltip
-                      title="Contacto Obrigatório"
-                      content="Número de telemóvel ativo (ex: 9803602 ou 9069235) para contacto urgente, confirmação de matrícula e avisos de início das aulas."
-                    />
-                  </label>
-                  <input
-                    id="campo-contacto"
-                    type="text"
-                    required
-                    placeholder="Ex: 9803602 ou 9069235"
-                    value={formData.contacto}
-                    onChange={(e) => setFormData({ ...formData, contacto: e.target.value })}
-                    className={getInputStyle('contacto')}
-                  />
-                  {fieldHasError('contacto') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Telefone principal é obrigatório.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Telefone Alternativo
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: 9803602"
-                    value={formData.contacto_alternativo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, contacto_alternativo: e.target.value })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Correio Eletrónico (Email)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="exemplo@gmail.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Habilitações Literárias, Formação e Situação perante o Emprego */}
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
-                <GraduationCap className="w-5 h-5 text-emerald-700" />
-                3. Habilitações Literárias, Experiência e Situação perante o Emprego (Secções 2 a 7 da Ficha)
-              </h3>
-
-              <div className="space-y-5 mt-4">
-                {/* Habilitações Literárias (Escolaridade e Área) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                      <span>Nível / Grau de Escolaridade Concluído *</span>
-                      <FieldTooltip
-                        title="Habilitações Literárias"
-                        content="Selecione o grau escolar concluído com aprovação que conste no seu certificado de habilitações."
-                      />
-                    </label>
-                    <select
-                      id="campo-habilitacao"
-                      required
-                      value={formData.habilitacao_literaria}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          habilitacao_literaria: e.target.value,
-                        })
-                      }
-                      className={getInputStyle('habilitacao_literaria')}
-                    >
-                      <option value="">Selecione o grau de escolaridade...</option>
-                      <option value="4.ª Classe (Ensino Básico 1.º Ciclo)">
-                        4.ª Classe (Ensino Básico 1.º Ciclo)
-                      </option>
-                      <option value="6.ª Classe (Ensino Básico 2.º Ciclo)">
-                        6.ª Classe (Ensino Básico 2.º Ciclo)
-                      </option>
-                      <option value="9.º Ano (Ensino Básico Integrado)">
-                        9.º Ano (Ensino Básico Integrado)
-                      </option>
-                      <option value="11.º Ano (Ensino Secundário Geral)">
-                        11.º Ano (Ensino Secundário Geral)
-                      </option>
-                      <option value="12.º Ano concluído (Ensino Secundário Geral)">
-                        12.º Ano concluído (Ensino Secundário Geral)
-                      </option>
-                      <option value="Formação Média / Técnico-Profissional">
-                        Formação Média / Técnico-Profissional
-                      </option>
-                      <option value="Ensino Superior / Frequência Universitária">
-                        Ensino Superior / Frequência Universitária
-                      </option>
-                      <option value="Licenciatura / Bacharelato">
-                        Licenciatura / Bacharelato
-                      </option>
-                      <option value="Mestrado / Pós-Graduação">
-                        Mestrado / Pós-Graduação
-                      </option>
-                      <option value="Outro">Outro</option>
-                    </select>
-                    {fieldHasError('habilitacao_literaria') && (
-                      <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                        Grau de escolaridade é obrigatório.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                      <span>Área / Ramo de Estudos das Habilitações</span>
-                      <FieldTooltip
-                        title="Área de Estudo"
-                        content="Indique a especialidade do curso secundário ou médio (ex: Ciências e Tecnologias, Gestão, Línguas e Humanidades, Eletrotécnica, etc.)."
-                      />
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Ciências e Tecnologias, Gestão, Letras, Geral..."
-                      value={formData.habilitacao_area}
-                      onChange={(e) =>
-                        setFormData({ ...formData, habilitacao_area: e.target.value })
-                      }
-                      className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                    />
-                  </div>
-                </div>
-
-                {/* Situação perante o Emprego - Checklist Interativo */}
-                <div
-                  id="campo-situacao"
-                  className={`space-y-2 p-3 rounded-xl transition-all ${
-                    fieldHasError('situacao_emprego') ? 'border-2 border-rose-500 bg-rose-50/80' : ''
-                  }`}
-                >
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Situação perante o Emprego (Secção 6) *</span>
-                    <FieldTooltip
-                      title="Situação Laboral Atual"
-                      content="Selecione a opção que melhor descreve a sua condição laboral no momento da inscrição."
-                    />
-                  </label>
-                  {fieldHasError('situacao_emprego') && (
-                    <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Por favor, selecione uma das opções de situação de emprego.
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                    {[
-                      {
-                        key: 'primeiro_emprego',
-                        titulo: 'À procura do 1.º emprego',
-                        subtitulo: 'Nunca trabalhou ou busca primeira colocação',
-                      },
-                      {
-                        key: 'novo_emprego',
-                        titulo: 'À procura de novo emprego',
-                        subtitulo: 'Desempregado à procura de nova oportunidade',
-                      },
-                      {
-                        key: 'empregado',
-                        titulo: 'Empregado / Trabalhador',
-                        subtitulo: 'Por conta de outrem ou por conta própria',
-                      },
-                      {
-                        key: 'horario_reduzido',
-                        titulo: 'Trabalhador com horário reduzido',
-                        subtitulo: 'Trabalho a tempo parcial ou sazonal',
-                      },
-                      {
-                        key: 'estudante',
-                        titulo: 'Estudante',
-                        subtitulo: 'Atualmente a frequentar o ensino regular',
-                      },
-                    ].map((item) => {
-                      const selecionado = formData.situacao_emprego === item.key || formData.situacao_emprego === item.titulo;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              situacao_emprego: item.key,
-                              ocupacao: item.titulo,
-                            })
-                          }
-                          className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                            selecionado
-                              ? 'bg-emerald-50 border-emerald-600 text-emerald-950 ring-1 ring-emerald-600'
-                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="shrink-0 mt-0.5">
-                            {selecionado ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-slate-300" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-xs leading-tight">{item.titulo}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{item.subtitulo}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Profissão exercida (se aplicável) */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Profissão / Função Atual ou Anterior (se aplicável)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Caso exerça ou tenha exercido atividade profissional..."
-                    value={formData.profissao}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        profissao: e.target.value,
-                        funcao_exerce: e.target.value,
-                        atividade_profissional_anterior: e.target.value,
-                      })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                {/* Formação Profissional e Experiência Profissional - Textareas */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                      <span>Formação Profissional Anterior (Secção 3)</span>
-                      <FieldTooltip
-                        title="Formações Anteriores"
-                        content="Descreva outros cursos técnicos, oficinas ou workshops que já concluiu (entidade, ano e carga horária)."
-                      />
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Ex: Curso Básico de Eletricidade na Escola Técnica (2024, 120h), Workshop de Segurança no Trabalho..."
-                      value={formData.formacao_profissional}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          formacao_profissional: e.target.value,
-                        })
-                      }
-                      className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                      <span>Experiência Profissional (Secção 4)</span>
-                      <FieldTooltip
-                        title="Experiência Prática"
-                        content="Descreva o seu histórico ou trabalhos práticos anteriores, empresas ou oficinas onde atuou."
-                      />
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Ex: Ajudante de eletricista / canalizador em obras durante 1 ano; manutenção de equipamentos..."
-                      value={formData.experiencia_profissional}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          experiencia_profissional: e.target.value,
-                        })
-                      }
-                      className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Casos Especiais / Apoio Social (Secção 7) */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.deficiente}
-                          onChange={(e) =>
-                            setFormData({ ...formData, deficiente: e.target.checked })
-                          }
-                          className="rounded border-slate-300 text-emerald-700 w-4 h-4"
-                        />
-                        <span>Possui necessidade especial ou caso específico (Secção 7)</span>
-                      </label>
-                      {formData.deficiente && (
-                        <input
-                          type="text"
-                          placeholder="Especifique a necessidade especial..."
-                          value={formData.tipo_deficiencia}
-                          onChange={(e) =>
-                            setFormData({ ...formData, tipo_deficiencia: e.target.value })
-                          }
-                          className="mt-2 w-full border border-slate-300 rounded bg-white p-2 text-xs"
-                        />
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.encaminhado_apoio_social}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              encaminhado_apoio_social: e.target.checked,
-                            })
-                          }
-                          className="rounded border-slate-300 text-emerald-700 w-4 h-4"
-                        />
-                        <span>Encaminhado por instituição de apoio social</span>
-                      </label>
-                      {formData.encaminhado_apoio_social && (
-                        <input
-                          type="text"
-                          placeholder="Nome da instituição de apoio social..."
-                          value={formData.instituicao_apoio_social}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              instituicao_apoio_social: e.target.value,
-                            })
-                          }
-                          className="mt-2 w-full border border-slate-300 rounded bg-white p-2 text-xs"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Escolha do Programa e Cursos CFP-STP (1ª e 2ª Opção) */}
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
-                <BookOpen className="w-5 h-5 text-emerald-700" />
-                4. Escolha do Programa e Cursos CFP-STP (Secção 8 — 1.ª e 2.ª Opção)
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Programa de Formação *</span>
-                    <FieldTooltip
-                      title="Programas Formativos"
-                      content="Qualificação Inicial (formação completa), Aperfeiçoamento (especialização rápida) ou Estágios Profissionais."
-                    />
-                  </label>
-                  <select
-                    id="campo-programa"
-                    required
-                    value={formData.programa_id || ''}
-                    onChange={(e) => handleProgramaChange(Number(e.target.value))}
-                    className={getInputStyle('programa_id', true)}
-                  >
-                    <option value="">Selecione o programa de formação...</option>
-                    {safeProgramas.map((p) => (
-                      <option key={p.id || p.ID} value={p.id || p.ID}>
-                        {p.nome}
-                      </option>
-                    ))}
-                  </select>
-                  {fieldHasError('programa_id') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Programa é obrigatório.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Curso — 1.ª Opção *</span>
-                    <FieldTooltip
-                      title="1.ª Opção Prioritária"
-                      content="O seu curso de maior preferência. Terá prioridade no processo de seriação e alocação de vagas."
-                    />
-                  </label>
-                  <select
-                    id="campo-curso-opcao1"
-                    required
-                    value={formData.curso_opcao1_id || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, curso_opcao1_id: Number(e.target.value) })
-                    }
-                    className={getInputStyle('curso_opcao1_id', true)}
-                  >
-                    <option value="">Selecione o curso (1.ª Opção)...</option>
-                    {listaCursosExibida.map((c) => (
-                      <option key={c.id || c.ID} value={c.id || c.ID}>
-                        {c.nome} ({c.horario || `${c.duracao}h`} · {c.local_realizacao || 'CFP-STP'})
-                      </option>
-                    ))}
-                  </select>
-                  {fieldHasError('curso_opcao1_id') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      1.ª Opção de Curso é obrigatória.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Curso — 2.ª Opção (Opcional)</span>
-                    <FieldTooltip
-                      title="2.ª Opção Alternativa"
-                      content="Curso alternativo caso as vagas da 1.ª opção estejam esgotadas. Não é obrigatório."
-                    />
-                  </label>
-                  <select
-                    value={formData.curso_opcao2_id || '0'}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        curso_opcao2_id: e.target.value ? Number(e.target.value) : 0,
-                      })
-                    }
-                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
-                  >
-                    <option value="0">-- Nenhuma (Sem 2.ª Opção) --</option>
-                    {safeCursos
-                      .filter((c) => Number(c.id || c.ID) !== Number(formData.curso_opcao1_id))
-                      .map((c) => (
-                        <option key={c.id || c.ID} value={c.id || c.ID}>
-                          {c.nome} ({c.programa_nome || `${c.duracao}h`})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div className="md:col-span-3">
-                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    <span>Motivo da Inscrição (Secção 5) *</span>
-                    <FieldTooltip
-                      title="Motivação"
-                      content="Descreva resumidamente os seus objetivos e por que escolheu esta formação técnica no CFP-STP."
-                    />
-                  </label>
-                  <textarea
-                    id="campo-motivo"
-                    required
-                    rows={2}
-                    placeholder="Explique o motivo da sua inscrição neste curso..."
-                    value={formData.motivo_inscricao}
-                    onChange={(e) =>
-                      setFormData({ ...formData, motivo_inscricao: e.target.value })
-                    }
-                    className={getInputStyle('motivo_inscricao')}
-                  />
-                  {fieldHasError('motivo_inscricao') && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Motivo da inscrição é obrigatório.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 5. Fotografia 3x4 e Documentos Comprovativos */}
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
-                <Upload className="w-5 h-5 text-emerald-700" />
-                5. Fotografia Tipo Passe e Documentos Comprovativos
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                {/* Fotografia com Câmara ou Upload */}
-                <div
-                  id="campo-foto"
-                  className="border border-dashed border-emerald-300 rounded-xl p-4 bg-emerald-50/30 space-y-2 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                        <span>Fotografia Tipo Passe</span>
-                        <FieldTooltip
-                          title="Foto Oficial"
-                          content="Foto frontal recente com fundo claro. Será impressa na página 1 da sua Ficha Oficial e no Cartão de Formando."
-                        />
-                      </label>
-                      <p className="text-[11px] text-slate-500">Impressa na Página 1 do PDF</p>
-                    </div>
-                    {fotoPreview && (
-                      <img
-                        src={fotoPreview}
-                        alt="Foto 3x4"
-                        className="w-10 h-12 object-cover rounded border border-emerald-400"
-                      />
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      handleFotoUpload(e.target.files ? e.target.files[0] : null)
-                    }
-                    className="text-xs w-full text-slate-600"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCameraAberta(true)}
-                    className="w-full py-1.5 px-3 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    Tirar Foto com a Câmara
-                  </button>
-                </div>
-
-                <div
-                  id="campo-bi-doc"
-                  className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2 transition-all"
-                >
-                  <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                    <span>Cópia do BI / Documento</span>
-                    <FieldTooltip
-                      title="Cópia do BI"
-                      content="Digitalização ou foto legível do seu Bilhete de Identidade ou Passaporte (frente e verso)."
-                    />
-                  </label>
-                  <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                  <input
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={(e) => setFileBi(e.target.files ? e.target.files[0] : null)}
-                    className="text-xs w-full text-slate-600"
-                  />
-                </div>
-
-                <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
-                  <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                    <span>Cópia do NIF (Contribuinte)</span>
-                    <FieldTooltip
-                      title="Cartão do NIF"
-                      content="Cópia do cartão de contribuinte ou comprovativo da Direção das Finanças."
-                    />
-                  </label>
-                  <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                  <input
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={(e) => setFileNif(e.target.files ? e.target.files[0] : null)}
-                    className="text-xs w-full text-slate-600"
-                  />
-                </div>
-
-                <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
-                  <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                    <span>Certificado de Habilitações</span>
-                    <FieldTooltip
-                      title="Certificado Escolar"
-                      content="Certificado ou declaração comprovativa do nível escolar concluído."
-                    />
-                  </label>
-                  <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                  <input
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={(e) =>
-                      setFileCertificado(e.target.files ? e.target.files[0] : null)
-                    }
-                    className="text-xs w-full text-slate-600"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 6. Autorização e Botão de Submissão */}
-            <div
-              id="campo-autorizacao_divulgacao_dados"
-              className={`p-4 rounded-xl space-y-3 transition-all ${
-                fieldHasError('autorizacao_divulgacao_dados')
-                  ? 'border-2 border-rose-500 bg-rose-50/90 text-rose-950'
-                  : 'bg-emerald-50/50 border border-emerald-200 text-slate-800'
-              }`}
-            >
-              <label className="flex items-start gap-2.5 text-xs font-medium cursor-pointer">
+                </label>
                 <input
-                  type="checkbox"
+                  id="campo-nome"
+                  type="text"
                   required
-                  checked={formData.autorizacao_divulgacao_dados}
+                  placeholder="Nome completo conforme o Bilhete de Identidade"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  className={getInputStyle('nome')}
+                />
+                {fieldHasError('nome') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Nome completo é obrigatório.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Filiação — Nome do Pai</span>
+                  <FieldTooltip
+                    title="Filiação Paterna"
+                    content="Nome do pai conforme a sua certidão de nascimento ou bilhete de identidade."
+                  />
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nome completo do pai"
+                  value={formData.nome_pai}
+                  onChange={(e) => setFormData({ ...formData, nome_pai: e.target.value })}
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Filiação — Nome da Mãe</span>
+                  <FieldTooltip
+                    title="Filiação Materna"
+                    content="Nome da mãe conforme a sua certidão de nascimento ou bilhete de identidade."
+                  />
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nome completo da mãe"
+                  value={formData.nome_mae}
+                  onChange={(e) => setFormData({ ...formData, nome_mae: e.target.value })}
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Bilhete de Identidade (BI) *</span>
+                  <FieldTooltip
+                    title="Número do Documento (BI)"
+                    content="Número do Bilhete de Identidade, Passaporte ou Cédula Pessoal."
+                  />
+                </label>
+                <input
+                  id="campo-bi"
+                  type="text"
+                  required
+                  placeholder="Ex: 145892STP"
+                  value={formData.bi}
+                  onChange={(e) => setFormData({ ...formData, bi: e.target.value })}
+                  className={getInputStyle('bi')}
+                />
+                {fieldHasError('bi') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Número de BI é obrigatório.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Arquivo de Identificação</span>
+                  <FieldTooltip
+                    title="Arquivo de Identificação"
+                    content="Repartição ou Conservatória do Registo Civil onde o seu documento foi emitido."
+                  />
+                </label>
+                <select
+                  value={formData.arquivo_identificacao}
+                  onChange={(e) =>
+                    setFormData({ ...formData, arquivo_identificacao: e.target.value })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
+                >
+                  {ARQUIVOS_IDENTIFICACAO.map((arq) => (
+                    <option key={arq} value={arq}>
+                      {arq}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>NIF (Contribuinte - Opcional)</span>
+                  <FieldTooltip
+                    title="NIF — Número de Identificação Fiscal"
+                    content="Número fiscal de 9 dígitos. Pode ser enviado em branco caso não possua."
+                  />
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 210495821 (Opcional)"
+                  value={formData.nif}
+                  onChange={(e) => setFormData({ ...formData, nif: e.target.value })}
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Data de Nascimento *</span>
+                  <FieldTooltip
+                    title="Idade Mínima"
+                    content="A idade mínima regulamentar para admissão aos cursos é de 16 anos completos."
+                  />
+                </label>
+                <input
+                  id="campo-data_nascimento"
+                  type="date"
+                  required
+                  value={formData.data_nascimento}
+                  onChange={(e) =>
+                    setFormData({ ...formData, data_nascimento: e.target.value })
+                  }
+                  className={getInputStyle('data_nascimento')}
+                />
+                {fieldHasError('data_nascimento') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Data de nascimento é obrigatória.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">Sexo *</label>
+                <select
+                  id="campo-sexo"
+                  required
+                  value={formData.sexo}
+                  onChange={(e) => setFormData({ ...formData, sexo: e.target.value, estado_civil: '' })}
+                  className={getInputStyle('sexo')}
+                >
+                  <option value="">Selecione o sexo...</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Feminino">Feminino</option>
+                </select>
+                {fieldHasError('sexo') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Seleção do sexo é obrigatória.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Estado Civil
+                </label>
+                <select
+                  value={formData.estado_civil}
+                  onChange={(e) =>
+                    setFormData({ ...formData, estado_civil: e.target.value })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
+                >
+                  <option value="">Selecione o estado civil...</option>
+                  {opcoesEstadoCivil.map((ec) => (
+                    <option key={ec} value={ec}>
+                      {ec}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Nacionalidade
+                </label>
+                <input
+                  type="text"
+                  value={formData.nacionalidade}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nacionalidade: e.target.value })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Naturalidade / Agregado</span>
+                  <FieldTooltip
+                    title="Naturalidade e Agregado"
+                    content="Local de nascimento e número de pessoas que coabitam no mesmo domicílio."
+                  />
+                </label>
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  <input
+                    type="text"
+                    placeholder="Naturalidade"
+                    value={formData.naturalidade}
+                    onChange={(e) =>
+                      setFormData({ ...formData, naturalidade: e.target.value })
+                    }
+                    className="col-span-2 border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={25}
+                    title="Nº de pessoas no agregado familiar"
+                    value={formData.agregado}
+                    onChange={(e) =>
+                      setFormData({ ...formData, agregado: e.target.value })
+                    }
+                    className="border border-slate-300 rounded-lg p-2.5 text-xs text-center focus:outline-none focus:border-emerald-700"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Contacto e Morada */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <MapPin className="w-5 h-5 text-emerald-700" />
+              2. Contacto, Morada e Distrito
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Distrito de Residência *</span>
+                  <FieldTooltip
+                    title="Distrito"
+                    content="Distrito de residência habitual para fins de alocação de centro formativo."
+                  />
+                </label>
+                <select
+                  id="campo-distrito"
+                  required
+                  value={formData.distrito}
+                  onChange={(e) => setFormData({ ...formData, distrito: e.target.value })}
+                  className={getInputStyle('distrito')}
+                >
+                  <option value="">Selecione o distrito...</option>
+                  {DISTRITOS_PERMITIDOS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                {fieldHasError('distrito') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Distrito é obrigatório.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Morada / Localidade
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Budo Budo, Riboque, Madre Deus, Trindade..."
+                  value={formData.morada}
+                  onChange={(e) =>
+                    setFormData({ ...formData, morada: e.target.value, zona: e.target.value })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Telefone Principal *</span>
+                  <FieldTooltip
+                    title="Contacto Obrigatório"
+                    content="Número de telemóvel ativo (ex: 9803602 ou 9069235) para contacto urgente."
+                  />
+                </label>
+                <input
+                  id="campo-contacto"
+                  type="text"
+                  required
+                  placeholder="Ex: 9803602 ou 9069235"
+                  value={formData.contacto}
+                  onChange={(e) => setFormData({ ...formData, contacto: e.target.value })}
+                  className={getInputStyle('contacto')}
+                />
+                {fieldHasError('contacto') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Telefone principal é obrigatório.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Telefone Alternativo
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 9803602"
+                  value={formData.contacto_alternativo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contacto_alternativo: e.target.value })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Correio Eletrónico (Email)
+                </label>
+                <input
+                  type="email"
+                  placeholder="exemplo@gmail.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Habilitações Literárias, Formação e Situação perante o Emprego */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <GraduationCap className="w-5 h-5 text-emerald-700" />
+              3. Habilitações Literárias, Experiência e Situação perante o Emprego
+            </h3>
+
+            <div className="space-y-5 mt-4">
+              {/* Habilitações Literárias (1.ª à 12.ª Classe, Licenciatura, Bacharelato, Mestrado, Pós-Graduação) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                    <span>Habilitação Literária Concluída *</span>
+                    <FieldTooltip
+                      title="Habilitações Literárias"
+                      content="Selecione de 1.ª à 12.ª Classe, Bacharelato, Licenciatura, Pós-Graduação, Mestrado ou Doutoramento."
+                    />
+                  </label>
+                  <select
+                    id="campo-habilitacao_literaria"
+                    required
+                    value={formData.habilitacao_literaria}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        habilitacao_literaria: e.target.value,
+                      })
+                    }
+                    className={getInputStyle('habilitacao_literaria')}
+                  >
+                    <option value="">Selecione a habilitação literária...</option>
+                    {OPCOES_HABILITACAO_LITERARIA.map((hab) => (
+                      <option key={hab} value={hab}>
+                        {hab}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldHasError('habilitacao_literaria') && (
+                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      Habilitação literária é obrigatória.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                    <span>Área ou Ramo de Formação</span>
+                    <FieldTooltip
+                      title="Área de Formação"
+                      content="Indique a área ou ramo de formação (ex: Engenharia Informática, Gestão, Ciências, Eletrotecnia). Será impressa em parênteses na Ficha PDF."
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Engenharia Informática, Gestão, Ciências e Tecnologias..."
+                    value={formData.habilitacao_area}
+                    onChange={(e) =>
+                      setFormData({ ...formData, habilitacao_area: e.target.value })
+                    }
+                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
+                  />
+                </div>
+              </div>
+
+              {/* Situação perante o Emprego */}
+              <div
+                id="campo-situacao_emprego"
+                className={`space-y-2 p-3 rounded-xl transition-all ${
+                  fieldHasError('situacao_emprego') ? 'border-2 border-rose-500 bg-rose-50/80' : ''
+                }`}
+              >
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Situação perante o Emprego (Secção 6) *</span>
+                  <FieldTooltip
+                    title="Situação Laboral Atual"
+                    content="Selecione a opção que melhor descreve a sua condição laboral no momento da inscrição."
+                  />
+                </label>
+                {fieldHasError('situacao_emprego') && (
+                  <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Por favor, selecione uma das opções de situação de emprego.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {[
+                    {
+                      key: 'primeiro_emprego',
+                      titulo: 'À procura do 1.º emprego',
+                      subtitulo: 'Nunca trabalhou ou busca primeira colocação',
+                    },
+                    {
+                      key: 'novo_emprego',
+                      titulo: 'À procura de novo emprego',
+                      subtitulo: 'Desempregado à procura de nova oportunidade',
+                    },
+                    {
+                      key: 'empregado',
+                      titulo: 'Empregado / Trabalhador',
+                      subtitulo: 'Por conta de outrem ou por conta própria',
+                    },
+                    {
+                      key: 'horario_reduzido',
+                      titulo: 'Trabalhador com horário reduzido',
+                      subtitulo: 'Trabalho a tempo parcial ou sazonal',
+                    },
+                    {
+                      key: 'estudante',
+                      titulo: 'Estudante',
+                      subtitulo: 'Atualmente a frequentar o ensino regular',
+                    },
+                  ].map((item) => {
+                    const selecionado = formData.situacao_emprego === item.key || formData.situacao_emprego === item.titulo;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            situacao_emprego: item.key,
+                            ocupacao: item.titulo,
+                          })
+                        }
+                        className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                          selecionado
+                            ? 'bg-emerald-50 border-emerald-600 text-emerald-950 ring-1 ring-emerald-600'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="shrink-0 mt-0.5">
+                          {selecionado ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full border border-slate-300" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-xs leading-tight">{item.titulo}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{item.subtitulo}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Profissão exercida */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Profissão / Função Atual ou Anterior (se aplicável)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Caso exerça ou tenha exercido atividade profissional..."
+                  value={formData.profissao}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      autorizacao_divulgacao_dados: e.target.checked,
+                      profissao: e.target.value,
+                      funcao_exerce: e.target.value,
+                      atividade_profissional_anterior: e.target.value,
                     })
                   }
-                  className="mt-0.5 rounded border-slate-300 text-emerald-700 w-4 h-4"
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700"
                 />
-                <span className="font-semibold leading-relaxed flex-1">
-                  9. — Declaro sob compromisso de honra que as informações fornecidas são verdadeiras e autorizo a utilização dos meus dados para fins pedagógicos e estatísticos da formação profissional, conforme o modelo oficial da Ficha de Inscrição do Formando do CFP-STP. *
-                </span>
-                <FieldTooltip
-                  title="Declaração de Veracidade"
-                  content="Termo legal de responsabilidade exigido pelo Centro de Formação Profissional para validação da candidatura."
-                />
-              </label>
-              {fieldHasError('autorizacao_divulgacao_dados') && (
-                <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  Deve aceitar a declaração de veracidade dos dados para submeter.
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200">
-              <p className="text-xs text-slate-500">
-                Ao submeter, a sua Ficha Oficial de 2 páginas em PDF será gerada e transferida automaticamente.
-              </p>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
+              {/* Formação Profissional e Experiência Profissional */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                    <span>Formação Profissional Anterior (Secção 3)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ex: Curso Básico de Eletricidade na Escola Técnica (2024, 120h)..."
+                    value={formData.formacao_profissional}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        formacao_profissional: e.target.value,
+                      })
+                    }
+                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                    <span>Experiência Profissional (Secção 4)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ex: Ajudante de eletricista / canalizador em obras..."
+                    value={formData.experiencia_profissional}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        experiencia_profissional: e.target.value,
+                      })
+                    }
+                    className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:border-emerald-700 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Casos Especiais */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.deficiente}
+                        onChange={(e) =>
+                          setFormData({ ...formData, deficiente: e.target.checked })
+                        }
+                        className="rounded border-slate-300 text-emerald-700 w-4 h-4"
+                      />
+                      <span>Possui necessidade especial ou caso específico (Secção 7)</span>
+                    </label>
+                    {formData.deficiente && (
+                      <input
+                        type="text"
+                        placeholder="Especifique a necessidade especial..."
+                        value={formData.tipo_deficiencia}
+                        onChange={(e) =>
+                          setFormData({ ...formData, tipo_deficiencia: e.target.value })
+                        }
+                        className="mt-2 w-full border border-slate-300 rounded bg-white p-2 text-xs"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.encaminhado_apoio_social}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            encaminhado_apoio_social: e.target.checked,
+                          })
+                        }
+                        className="rounded border-slate-300 text-emerald-700 w-4 h-4"
+                      />
+                      <span>Encaminhado por instituição de apoio social</span>
+                    </label>
+                    {formData.encaminhado_apoio_social && (
+                      <input
+                        type="text"
+                        placeholder="Nome da instituição de apoio social..."
+                        value={formData.instituicao_apoio_social}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            instituicao_apoio_social: e.target.value,
+                          })
+                        }
+                        className="mt-2 w-full border border-slate-300 rounded bg-white p-2 text-xs"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Escolha do Programa e Cursos CFP-STP (1ª e 2ª Opção) */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <BookOpen className="w-5 h-5 text-emerald-700" />
+              4. Escolha do Programa e Cursos CFP-STP (Secção 8 — 1.ª e 2.ª Opção)
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Programa de Formação *</span>
+                  <FieldTooltip
+                    title="Programas Formativos"
+                    content="Selecione o programa de formação do CFP-STP."
+                  />
+                </label>
+                <select
+                  id="campo-programa_id"
+                  required
+                  value={formData.programa_id || ''}
+                  onChange={(e) => handleProgramaChange(Number(e.target.value))}
+                  className={getInputStyle('programa_id', true)}
+                >
+                  <option value="">Selecione o programa de formação...</option>
+                  {safeProgramas.map((p) => (
+                    <option key={p.id || p.ID} value={p.id || p.ID}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+                {fieldHasError('programa_id') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Programa é obrigatório.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Curso — 1.ª Opção *</span>
+                  <FieldTooltip
+                    title="1.ª Opção Prioritária"
+                    content="O seu curso de maior preferência."
+                  />
+                </label>
+                <select
+                  id="campo-curso_opcao1_id"
+                  required
+                  value={formData.curso_opcao1_id || ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, curso_opcao1_id: Number(e.target.value) })
+                  }
+                  className={getInputStyle('curso_opcao1_id', true)}
+                >
+                  <option value="">Selecione o curso (1.ª Opção)...</option>
+                  {listaCursosExibida.map((c) => (
+                    <option key={c.id || c.ID} value={c.id || c.ID}>
+                      {c.nome} ({c.horario || `${c.duracao}h`} · {c.local_realizacao || 'CFP-STP'})
+                    </option>
+                  ))}
+                </select>
+                {fieldHasError('curso_opcao1_id') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    1.ª Opção de Curso é obrigatória.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Curso — 2.ª Opção (Opcional)</span>
+                  <FieldTooltip
+                    title="2.ª Opção Alternativa"
+                    content="Curso alternativo opcional. Não se autoprenche automaticamente."
+                  />
+                </label>
+                <select
+                  value={formData.curso_opcao2_id || '0'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      curso_opcao2_id: e.target.value ? Number(e.target.value) : 0,
+                    })
+                  }
+                  className="mt-1 w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white focus:outline-none focus:border-emerald-700"
+                >
+                  <option value="0">-- Nenhuma (Sem 2.ª Opção) --</option>
+                  {safeCursos
+                    .filter((c) => Number(c.id || c.ID) !== Number(formData.curso_opcao1_id))
+                    .map((c) => (
+                      <option key={c.id || c.ID} value={c.id || c.ID}>
+                        {c.nome} ({c.programa_nome || `${c.duracao}h`})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <span>Motivo da Inscrição (Secção 5) *</span>
+                  <FieldTooltip
+                    title="Motivação"
+                    content="Descreva resumidamente os seus objetivos ao escolher esta formação."
+                  />
+                </label>
+                <textarea
+                  id="campo-motivo_inscricao"
+                  required
+                  rows={2}
+                  placeholder="Explique o motivo da sua inscrição neste curso..."
+                  value={formData.motivo_inscricao}
+                  onChange={(e) =>
+                    setFormData({ ...formData, motivo_inscricao: e.target.value })
+                  }
+                  className={getInputStyle('motivo_inscricao')}
+                />
+                {fieldHasError('motivo_inscricao') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Motivo da inscrição é obrigatório.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Fotografia 3x4 (Obrigatória) e Documentos Comprovativos (Opcionais) */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
+              <Upload className="w-5 h-5 text-emerald-700" />
+              5. Fotografia Tipo Passe (Obrigatória) e Documentos
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              {/* Fotografia - OBRIGATÓRIA */}
+              <div
+                id="campo-foto"
+                className={`border-2 rounded-xl p-4 space-y-2 transition-all ${
+                  fieldHasError('foto')
+                    ? 'border-rose-500 bg-rose-50/90 text-rose-950'
+                    : 'border-dashed border-emerald-400 bg-emerald-50/30'
+                }`}
               >
-                <Send className="w-4 h-4" />
-                {submitting
-                  ? 'A Registar e Gerar Ficha PDF...'
-                  : 'Submeter Candidatura e Baixar Ficha Oficial (PDF)'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Coluna Lateral Sticky com Requisitos e Instruções Oficiais (4 colunas) */}
-        <div className="xl:col-span-4 xl:sticky xl:top-20 space-y-4">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-              <ShieldCheck className="w-5 h-5 text-emerald-700" />
-              <h4 className="font-bold text-slate-900 text-sm">Instruções de Preenchimento</h4>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Por favor, preencha todos os campos obrigatórios assinalados com o asterisco (<strong>*</strong>). Caso exista algum campo em falta ao submeter, ele será <strong className="text-rose-600">destacado a cor vermelha</strong>.
-            </p>
-
-            <div className="space-y-2 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="font-bold text-emerald-800 text-[11px] uppercase tracking-wider block">
-                  1. Documento de Identificação
-                </span>
-                <p className="text-slate-600 text-[11px]">
-                  O número de BI/Passaporte servirá para gerar o seu número de processo no CFP-STP.
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
+                      <span>Fotografia Tipo Passe *</span>
+                      <FieldTooltip
+                        title="Foto Oficial Obrigatória"
+                        content="Foto frontal recente com fundo claro. É estritamente obrigatória para emissão da Ficha de Inscrição."
+                      />
+                    </label>
+                    <p className="text-[11px] text-slate-500">Impressa na Página 1 do PDF</p>
+                  </div>
+                  {fotoPreview && (
+                    <img
+                      src={fotoPreview}
+                      alt="Foto 3x4"
+                      className="w-10 h-12 object-cover rounded border border-emerald-400"
+                    />
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    handleFotoUpload(e.target.files ? e.target.files[0] : null)
+                  }
+                  className="text-xs w-full text-slate-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCameraAberta(true)}
+                  className="w-full py-1.5 px-3 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  Tirar Foto com a Câmara
+                </button>
+                {fieldHasError('foto') && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    Fotografia tipo passe é obrigatória.
+                  </p>
+                )}
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="font-bold text-emerald-800 text-[11px] uppercase tracking-wider block">
-                  2. Emissão da Ficha PDF
-                </span>
-                <p className="text-slate-600 text-[11px]">
-                  Após a submissão com sucesso, a Ficha Oficial de 2 páginas em PDF é gerada e transferida automaticamente.
-                </p>
+              {/* Documentos Opcionais */}
+              <div
+                id="campo-bi-doc"
+                className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2 transition-all"
+              >
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
+                  <span>Cópia do BI / Documento (Opcional)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setFileBi(e.target.files ? e.target.files[0] : null)}
+                  className="text-xs w-full text-slate-600"
+                />
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="font-bold text-emerald-800 text-[11px] uppercase tracking-wider block">
-                  3. Acompanhamento
-                </span>
-                <p className="text-slate-600 text-[11px]">
-                  Guarde o código <code>CAND-2026-XXXX</code> para consultar o estado do seu processo no separador "Consultar Estado".
-                </p>
+              <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
+                  <span>Cópia do NIF (Opcional)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setFileNif(e.target.files ? e.target.files[0] : null)}
+                  className="text-xs w-full text-slate-600"
+                />
+              </div>
+
+              <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
+                  <span>Certificado de Habilitações (Opcional)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) =>
+                    setFileCertificado(e.target.files ? e.target.files[0] : null)
+                  }
+                  className="text-xs w-full text-slate-600"
+                />
               </div>
             </div>
           </div>
 
-          {/* Dica Rápida de Suporte */}
-          <div className="bg-slate-900 text-white rounded-2xl p-4 text-xs border border-slate-800 space-y-2">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Suporte da Secretaria</span>
-            </div>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
-              O formulário gera diretamente o código de protocolo <code>CAND-2026-XXXX</code> e a Ficha PDF de 2 páginas.
-            </p>
-            <div className="pt-1 text-[11px] text-slate-400 border-t border-slate-800">
-              Dúvidas? Tel: <strong className="text-white">+239 980 3602</strong>
-            </div>
+          {/* 6. Autorização e Botão de Submissão */}
+          <div
+            id="campo-autorizacao_divulgacao_dados"
+            className={`p-4 rounded-xl space-y-3 transition-all ${
+              fieldHasError('autorizacao_divulgacao_dados')
+                ? 'border-2 border-rose-500 bg-rose-50/90 text-rose-950'
+                : 'bg-emerald-50/50 border border-emerald-200 text-slate-800'
+            }`}
+          >
+            <label className="flex items-start gap-2.5 text-xs font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                required
+                checked={formData.autorizacao_divulgacao_dados}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    autorizacao_divulgacao_dados: e.target.checked,
+                  })
+                }
+                className="mt-0.5 rounded border-slate-300 text-emerald-700 w-4 h-4"
+              />
+              <span className="font-semibold leading-relaxed flex-1">
+                9. — Declaro sob compromisso de honra que as informações fornecidas são verdadeiras e autorizo a utilização dos meus dados para fins pedagógicos e estatísticos da formação profissional, conforme o modelo oficial da Ficha de Inscrição do Formando do CFP-STP. *
+              </span>
+              <FieldTooltip
+                title="Declaração de Veracidade"
+                content="Termo legal de responsabilidade exigido pelo Centro de Formação Profissional para validação da candidatura."
+              />
+            </label>
+            {fieldHasError('autorizacao_divulgacao_dados') && (
+              <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                Deve aceitar a declaração de veracidade dos dados para submeter.
+              </p>
+            )}
           </div>
-        </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200">
+            <p className="text-xs text-slate-500">
+              Ao submeter, a sua Ficha Oficial de 2 páginas em PDF será gerada e transferida automaticamente.
+            </p>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              {submitting
+                ? 'A Registar e Gerar Ficha PDF...'
+                : 'Submeter Candidatura e Baixar Ficha Oficial (PDF)'}
+            </button>
+          </div>
+        </form>
       </div>
 
       <CameraCaptureModal

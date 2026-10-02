@@ -671,11 +671,6 @@ export const FichaComprovativoView: React.FC<FichaComprovativoViewProps> = ({
               </div>
             </div>
 
-            {/* Nota Obrigatória */}
-            <div className="mt-8 border-t border-slate-400 pt-4 text-[11px] leading-relaxed text-slate-800">
-              <strong>Nota:</strong> Deve-se anexar à ficha de inscrição,{' '}
-              <strong>OBRIGATÓRIAMENTE,</strong> a fotocópia do Bilhete de Identidade e fotocópia de Cartão de Identificação Fiscal e cópia Certificado de Habilitações Literárias(autenticada) e carta ou declaração de serviço para inscritos que trabalham.
-            </div>
 
             <RodapeOficialCfp pagina="2/2" />
           </div>
