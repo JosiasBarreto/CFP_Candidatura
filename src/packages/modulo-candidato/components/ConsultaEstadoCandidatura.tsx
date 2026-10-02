@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import {
   Search,
   Download,
@@ -29,15 +30,51 @@ export const ConsultaEstadoCandidatura: React.FC<ConsultaEstadoCandidaturaProps>
   const [fichaVisualizar, setFichaVisualizar] = useState<CandidaturaPublica | null>(null);
 
   const executarPesquisa = async (termo: string) => {
-    if (!termo.trim()) return;
+    if (!termo.trim()) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Pesquisa Vazia',
+        text: 'Por favor, digite o número do BI ou o Código de Protocolo para pesquisar.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#047857',
+        customClass: {
+          popup: 'rounded-2xl',
+          confirmButton: 'rounded-xl text-xs px-5 py-2.5 font-bold cursor-pointer',
+        },
+      });
+      return;
+    }
     setBuscando(true);
     aoNotificar(null);
     try {
       const lista = await candidatoApi.consultarPorBiOuCodigo(termo);
       setCandidaturas(lista);
+      if (lista.length === 0) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Nenhuma Candidatura Encontrada',
+          text: `Não foi encontrada nenhuma candidatura com o termo "${termo}". Verifique se digitou corretamente o número do BI ou o código de protocolo (ex: CAND-2026-0001).`,
+          confirmButtonText: 'Tentar Novamente',
+          confirmButtonColor: '#047857',
+          customClass: {
+            popup: 'rounded-2xl',
+            confirmButton: 'rounded-xl text-xs px-5 py-2.5 font-bold cursor-pointer',
+          },
+        });
+      }
     } catch (e: any) {
       setCandidaturas([]);
-      aoNotificar({ tipo: 'erro', texto: e.message });
+      Swal.fire({
+        icon: 'error',
+        title: 'Erro na Consulta',
+        text: e.message || 'Ocorreu uma falha ao consultar a candidatura no servidor.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#dc2626',
+        customClass: {
+          popup: 'rounded-2xl',
+          confirmButton: 'rounded-xl text-xs px-5 py-2.5 font-bold cursor-pointer',
+        },
+      });
     } finally {
       setBuscando(false);
     }
