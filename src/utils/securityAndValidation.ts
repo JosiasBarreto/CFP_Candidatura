@@ -127,9 +127,12 @@ export const sanitizarEntradaSegura = (valor: string, maxLen = 180): string => {
     .slice(0, maxLen);
 };
 
-export const calcularIdade = (dataNasc?: string): number | null => {
+export const calcularIdade = (
+  dataNasc?: string,
+  dataReferencia?: string | number | Date
+): number | null => {
   if (!dataNasc) return null;
-  const limpo = dataNasc.split('T')[0].trim();
+  const limpo = dataNasc.split('T')[0].split(' ')[0].trim();
   let ano = 0;
   let mes = 0;
   let dia = 0;
@@ -174,10 +177,40 @@ export const calcularIdade = (dataNasc?: string): number | null => {
     dia = nasc.getDate();
   }
 
-  const hoje = new Date();
-  let idade = hoje.getFullYear() - ano;
-  const m = hoje.getMonth() - mes;
-  if (m < 0 || (m === 0 && hoje.getDate() < dia)) {
+  let refAno: number;
+  let refMes: number;
+  let refDia: number;
+
+  if (typeof dataReferencia === 'number' && dataReferencia > 1900 && dataReferencia < 2100) {
+    refAno = dataReferencia;
+    refMes = 11;
+    refDia = 31;
+  } else if (dataReferencia instanceof Date && !isNaN(dataReferencia.getTime())) {
+    refAno = dataReferencia.getFullYear();
+    refMes = dataReferencia.getMonth();
+    refDia = dataReferencia.getDate();
+  } else if (typeof dataReferencia === 'string' && dataReferencia.trim()) {
+    const refDate = new Date(dataReferencia);
+    if (!isNaN(refDate.getTime())) {
+      refAno = refDate.getFullYear();
+      refMes = refDate.getMonth();
+      refDia = refDate.getDate();
+    } else {
+      const hoje = new Date();
+      refAno = hoje.getFullYear();
+      refMes = hoje.getMonth();
+      refDia = hoje.getDate();
+    }
+  } else {
+    const hoje = new Date();
+    refAno = hoje.getFullYear();
+    refMes = hoje.getMonth();
+    refDia = hoje.getDate();
+  }
+
+  let idade = refAno - ano;
+  const m = refMes - mes;
+  if (m < 0 || (m === 0 && refDia < dia)) {
     idade--;
   }
   return idade >= 0 ? idade : null;

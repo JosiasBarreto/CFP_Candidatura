@@ -16,7 +16,8 @@ export function converterCandidaturaParaDadosFicha(
       : c2?.horario || '';
 
   const dataNascimento = cand.data_nascimento || '';
-  const idadeCalculada = dataNascimento ? calcularIdade(dataNascimento) : null;
+  const refData = cand.data_submissao || cand.data_criacao || cand.ano || 2026;
+  const idadeCalculada = dataNascimento ? calcularIdade(dataNascimento, refData) : null;
   const idadeFinal =
     idadeCalculada !== null && idadeCalculada >= 0
       ? String(idadeCalculada)

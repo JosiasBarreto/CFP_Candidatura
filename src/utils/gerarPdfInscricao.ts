@@ -65,36 +65,29 @@ export const verificarProgramaSelecionado = (
     | 'ACPE'
     | 'OUTROS'
 ): boolean => {
-  const progNome = (dados.programa_nome || '').toUpperCase();
+  const progNome = (dados.programa_nome || '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
   const progId = Number(dados.programa_id || 0);
 
-  switch (chavePrograma) {
-    case 'QUALIFICACAO_INICIAL':
-      return (
-        progId === 1 ||
-        (progNome.includes('QUALIFICA') && !progNome.includes('EMPREGO'))
-      );
-    case 'APRENDIZAGEM':
-      return progId === 4 || progNome.includes('APRENDIZAGEM');
-    case 'APERFEICOAMENTO':
-      return progId === 3 || progNome.includes('APERFEI');
-    case 'ESTAGIO':
-      return progId === 2 || progNome.includes('ESTÁGIO') || progNome.includes('ESTAGIO');
-    case 'QUALIFICACAO_EMPREGO':
-      return progNome.includes('QUALIFICAÇÃO E EMPREGO') || progNome.includes('EMPREGO');
-    case 'ACPE':
-      return progId === 5 || progNome.includes('ACPE') || progNome.includes('GESTÃO') || progNome.includes('GESTAO');
-    case 'OUTROS':
-      return (
-        Boolean(progNome) &&
-        !verificarProgramaSelecionado(dados, 'QUALIFICACAO_INICIAL') &&
-        !verificarProgramaSelecionado(dados, 'APRENDIZAGEM') &&
-        !verificarProgramaSelecionado(dados, 'APERFEICOAMENTO') &&
-        !verificarProgramaSelecionado(dados, 'ESTAGIO') &&
-        !verificarProgramaSelecionado(dados, 'QUALIFICACAO_EMPREGO') &&
-        !verificarProgramaSelecionado(dados, 'ACPE')
-      );
+  let programaDetectado: 'QUALIFICACAO_INICIAL' | 'APRENDIZAGEM' | 'APERFEICOAMENTO' | 'ESTAGIO' | 'QUALIFICACAO_EMPREGO' | 'ACPE' | 'OUTROS' = 'OUTROS';
+
+  if (progNome.includes('ACPE') || progNome.includes('PROPRIO EMPREGO') || progNome.includes('GESTAO DE PEQUENO') || progId === 3) {
+    programaDetectado = 'ACPE';
+  } else if (progNome.includes('QUALIFICACAO E EMPREGO') || progNome.includes('QUALIFICACAO PARA O EMPREGO')) {
+    programaDetectado = 'QUALIFICACAO_EMPREGO';
+  } else if (progNome.includes('APERFEICOA') || progId === 4) {
+    programaDetectado = 'APERFEICOAMENTO';
+  } else if (progNome.includes('ESTAGIO') || progId === 2) {
+    programaDetectado = 'ESTAGIO';
+  } else if (progNome.includes('APRENDIZAGEM') || progId === 5) {
+    programaDetectado = 'APRENDIZAGEM';
+  } else if (progNome.includes('QUALIFICA') || progId === 1) {
+    programaDetectado = 'QUALIFICACAO_INICIAL';
   }
+
+  return chavePrograma === programaDetectado;
 };
 
 /**
@@ -431,7 +424,8 @@ export const gerarPdfFormularioInscricao = async (
 
   lx = drawLabel('Idade', lx + 30, y, 8.8);
   let idadeTexto = '';
-  const idCalc = dados.datanascimento ? calcularIdade(dados.datanascimento) : null;
+  const refData = dados.data_inscricao || dados.ano || 2026;
+  const idCalc = dados.datanascimento ? calcularIdade(dados.datanascimento, refData) : null;
   if (idCalc !== null && idCalc >= 0) {
     idadeTexto = `${idCalc} anos`;
   } else if (dados.idade && !isNaN(Number(dados.idade)) && Number(dados.idade) > 0) {
