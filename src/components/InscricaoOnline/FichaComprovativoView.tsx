@@ -8,7 +8,7 @@ import {
   Edit3,
   FileText,
 } from 'lucide-react';
-import { DadosInscricaoFormando } from '../../utils/securityAndValidation';
+import { DadosInscricaoFormando, calcularIdade } from '../../utils/securityAndValidation';
 import {
   gerarPdfFormularioInscricao,
   obterNomeFicheiroPdf,
@@ -319,7 +319,11 @@ export const FichaComprovativoView: React.FC<FichaComprovativoViewProps> = ({
                 <div className="flex items-baseline gap-2 flex-1 min-w-[120px]">
                   <span>Idade</span>
                   <span className="flex-1 border-b border-slate-700 px-2 text-center font-mono-tabular">
-                    {dados.idade ? `${dados.idade} anos` : ''}
+                    {dados.idade && !isNaN(Number(dados.idade)) && Number(dados.idade) > 0
+                      ? `${dados.idade} anos`
+                      : dados.datanascimento && calcularIdade(dados.datanascimento) !== null
+                      ? `${calcularIdade(dados.datanascimento)} anos`
+                      : ''}
                   </span>
                 </div>
               </div>

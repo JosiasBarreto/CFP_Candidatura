@@ -1,5 +1,5 @@
 import { CandidaturaPublica } from '../types';
-import { DadosInscricaoFormando } from '../../../utils/securityAndValidation';
+import { DadosInscricaoFormando, calcularIdade } from '../../../utils/securityAndValidation';
 
 export function converterCandidaturaParaDadosFicha(
   cand: CandidaturaPublica
@@ -15,6 +15,15 @@ export function converterCandidaturaParaDadosFicha(
       ? `${c2.horario}–${c2.horario_termino}`
       : c2?.horario || '';
 
+  const dataNascimento = cand.data_nascimento || '';
+  const idadeCalculada = dataNascimento ? calcularIdade(dataNascimento) : null;
+  const idadeFinal =
+    cand.idade && Number(cand.idade) > 0
+      ? String(cand.idade)
+      : idadeCalculada !== null && idadeCalculada >= 0
+      ? String(idadeCalculada)
+      : '';
+
   return {
     id: String(cand.id),
     protocolo: cand.codigo,
@@ -28,8 +37,8 @@ export function converterCandidaturaParaDadosFicha(
     arquivo_identificacao:
       cand.arquivo_identificacao || 'Centro de Identificação Civil e Criminal (CICC - STP)',
     nif: cand.nif || '',
-    datanascimento: cand.data_nascimento || '',
-    idade: String(cand.idade || 22),
+    datanascimento: dataNascimento,
+    idade: idadeFinal,
     sexo: cand.sexo || 'Masculino',
     nacionalidade: cand.nacionalidade || 'Santomense',
     naturalidade: cand.naturalidade || cand.distrito || 'São Tomé',

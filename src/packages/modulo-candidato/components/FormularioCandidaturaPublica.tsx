@@ -20,6 +20,7 @@ import { ProgramaPublico, CursoPublico, CandidaturaPublica } from '../types';
 import { candidatoApi } from '../services/candidatoApi';
 import { converterCandidaturaParaDadosFicha } from '../utils/candidaturaMapper';
 import { exportarInscricaoParaExcel } from '../../../utils/pdfFichaGenerator';
+import { calcularIdade } from '../../../utils/securityAndValidation';
 import { FichaComprovativoView } from '../../../components/InscricaoOnline/FichaComprovativoView';
 import { CameraCaptureModal } from '../../../components/InscricaoOnline/CameraCaptureModal';
 import { FieldTooltip } from './FieldTooltip';
@@ -239,6 +240,11 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     payload.append('area_formacao', formData.habilitacao_area || '');
     payload.append('Área de Formação', formData.habilitacao_area || '');
 
+    const idadeCalculada = calcularIdade(formData.data_nascimento);
+    if (idadeCalculada !== null && idadeCalculada >= 0) {
+      payload.append('idade', String(idadeCalculada));
+    }
+
     if (fotoPreview) {
       payload.append('fotoPreview', fotoPreview);
     }
@@ -251,7 +257,9 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
       const json = await candidatoApi.submeterCandidaturaPublica(payload);
       const cand: CandidaturaPublica = {
         ...json.candidatura,
-        foto_data_url: fotoPreview || json.candidatura.foto_data_url,
+        data_nascimento: formData.data_nascimento || json.candidatura?.data_nascimento,
+        idade: json.candidatura?.idade || (idadeCalculada !== null ? idadeCalculada : undefined),
+        foto_data_url: fotoPreview || json.candidatura?.foto_data_url,
       };
       setCandidaturaRecemCriada(cand);
 

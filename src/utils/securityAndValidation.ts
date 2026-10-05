@@ -127,17 +127,60 @@ export const sanitizarEntradaSegura = (valor: string, maxLen = 180): string => {
     .slice(0, maxLen);
 };
 
-export const calcularIdade = (dataNasc: string): number | null => {
+export const calcularIdade = (dataNasc?: string): number | null => {
   if (!dataNasc) return null;
+  const limpo = dataNasc.split('T')[0].trim();
+  let ano = 0;
+  let mes = 0;
+  let dia = 0;
+
+  if (limpo.includes('-')) {
+    const partes = limpo.split('-');
+    if (partes.length === 3) {
+      if (partes[0].length === 4) {
+        // YYYY-MM-DD
+        ano = parseInt(partes[0], 10);
+        mes = parseInt(partes[1], 10) - 1;
+        dia = parseInt(partes[2], 10);
+      } else {
+        // DD-MM-YYYY
+        dia = parseInt(partes[0], 10);
+        mes = parseInt(partes[1], 10) - 1;
+        ano = parseInt(partes[2], 10);
+      }
+    }
+  } else if (limpo.includes('/')) {
+    const partes = limpo.split('/');
+    if (partes.length === 3) {
+      if (partes[0].length === 4) {
+        // YYYY/MM/DD
+        ano = parseInt(partes[0], 10);
+        mes = parseInt(partes[1], 10) - 1;
+        dia = parseInt(partes[2], 10);
+      } else {
+        // DD/MM/YYYY
+        dia = parseInt(partes[0], 10);
+        mes = parseInt(partes[1], 10) - 1;
+        ano = parseInt(partes[2], 10);
+      }
+    }
+  }
+
+  if (!ano || isNaN(ano) || isNaN(mes) || isNaN(dia)) {
+    const nasc = new Date(dataNasc);
+    if (isNaN(nasc.getTime())) return null;
+    ano = nasc.getFullYear();
+    mes = nasc.getMonth();
+    dia = nasc.getDate();
+  }
+
   const hoje = new Date();
-  const nasc = new Date(dataNasc);
-  if (isNaN(nasc.getTime())) return null;
-  let idade = hoje.getFullYear() - nasc.getFullYear();
-  const m = hoje.getMonth() - nasc.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
+  let idade = hoje.getFullYear() - ano;
+  const m = hoje.getMonth() - mes;
+  if (m < 0 || (m === 0 && hoje.getDate() < dia)) {
     idade--;
   }
-  return idade;
+  return idade >= 0 ? idade : null;
 };
 
 export const comporHabilitacaoCompleta = (

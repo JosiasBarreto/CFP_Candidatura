@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { DadosInscricaoFormando } from './securityAndValidation';
+import { DadosInscricaoFormando, calcularIdade } from './securityAndValidation';
 import { obterLogosEmDataUrl } from './pdfLogos';
 
 export const obterNomeFicheiroPdf = (dados: DadosInscricaoFormando): string => {
@@ -430,7 +430,16 @@ export const gerarPdfFormularioInscricao = async (
   drawUnderlinedValue(lx, lx + 28, y + 0.3, dados.sexo);
 
   lx = drawLabel('Idade', lx + 30, y, 8.8);
-  drawUnderlinedValue(lx, rightEdge, y + 0.3, dados.idade ? `${dados.idade} anos` : '');
+  let idadeTexto = '';
+  if (dados.idade && !isNaN(Number(dados.idade)) && Number(dados.idade) > 0) {
+    idadeTexto = `${dados.idade} anos`;
+  } else if (dados.datanascimento) {
+    const idCalc = calcularIdade(dados.datanascimento);
+    if (idCalc !== null && idCalc >= 0) {
+      idadeTexto = `${idCalc} anos`;
+    }
+  }
+  drawUnderlinedValue(lx, rightEdge, y + 0.3, idadeTexto);
 
   // Nacionalidade: _____ Local de Nascimento _____
   y += lineStep;
