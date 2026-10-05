@@ -71,81 +71,113 @@ export const verificarConexaoBackend = async ():  Promise<ResultadoStatusBackend
 };
 
 // =============================================================================
-// SERVIÇOS DE PROGRAMAS DE FORMAÇÃO
+// SERVIÇOS DE CURSOS E PROGRAMAS (OBTIDOS EXCLUSIVAMENTE VIA /curso/busca)
 // =============================================================================
-export const programasService = {
+let cacheCursosPromise: Promise<CursoPublico[]> | null = null;
+let cacheCursosData: CursoPublico[] | null = null;
+
+export const cursosService = {
   /**
-   * Obtém a lista de programas de formação ativos no CFP-STP
-   * Conforme Manual: GET http://192.168.100.141:5000/programas
+   * Obtém cursos exclusivamente a partir de /curso/busca
+   * Conforme especificação estrita: Nunca requisita /cursos ou /programas
    */
-  async listar(): Promise<ProgramaPublico[]> {
-    try {
-      let response = await apiClient.get<any>('/programas').catch(() => null);
-      if (!response || !response.data) {
-        response = await apiClient.get<any>('/programa').catch(() => null);
-      }
-      const data = response?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.programas)) return data.programas;
-      if (data && Array.isArray(data.data)) return data.data;
-      if (data && Array.isArray(data.rows)) return data.rows;
-      return [];
-    } catch (e) {
-      console.warn('[programasService] Erro ao carregar programas do servidor:', e);
-      return [];
+  async buscarTodos(forceRefresh = false): Promise<CursoPublico[]> {
+    if (cacheCursosData && !forceRefresh) {
+      return cacheCursosData;
     }
+    if (cacheCursosPromise && !forceRefresh) {
+      return cacheCursosPromise;
+    }
+
+    cacheCursosPromise = (async () => {
+      try {
+        let response = await apiClient
+          .post<any>('/curso/busca', { ano_execucao: 2026 })
+          .catch(() => null);
+
+        if (!response || !response.data) {
+          response = await apiClient.get<any>('/curso/busca').catch(() => null);
+        }
+        if (!response || !response.data) {
+          response = await apiClient.post<any>('/curso/busca', {}).catch(() => null);
+        }
+
+        const data = response?.data;
+        let listaBruta: any[] = [];
+        if (Array.isArray(data)) listaBruta = data;
+        else if (data && Array.isArray(data.cursos)) listaBruta = data.cursos;
+        else if (data && Array.isArray(data.data)) listaBruta = data.data;
+        else if (data && Array.isArray(data.rows)) listaBruta = data.rows;
+
+        cacheCursosData = listaBruta.map((item: any) => ({
+          id: Number(item.id || item.ID),
+          ID: Number(item.id || item.ID),
+          nome: item.nome || '',
+          acao: item.acao || '',
+          duracao: Number(item.duracao || 0),
+          duracao_mes: Number(item.duracao_mes || 0),
+          horario: item.horario || '',
+          horario_termino: item.horario_termino || '',
+          local_realizacao: item.local_realizacao || 'CFP-STP',
+          fk_programa: Number(item.programa_id || item.fk_programa || 1),
+          programa_id: Number(item.programa_id || item.fk_programa || 1),
+          programa_nome: item.programa_nome || '',
+          ano_execucao: Number(item.ano_execucao || 2026),
+          descricao: item.descricao || '',
+        }));
+
+        return cacheCursosData;
+      } catch (e) {
+        console.warn('[cursosService] Erro ao carregar /curso/busca:', e);
+        return cacheCursosData || [];
+      } finally {
+        cacheCursosPromise = null;
+      }
+    })();
+
+    return cacheCursosPromise;
+  },
+
+  async listar(programaId?: number): Promise<CursoPublico[]> {
+    const todos = await this.buscarTodos();
+    if (programaId && Number(programaId) > 0) {
+      return todos.filter((c) => Number(c.programa_id || c.fk_programa) === Number(programaId));
+    }
+    return todos;
+  },
+
+  async buscarPorAno(ano?: number): Promise<CursoPublico[]> {
+    const todos = await this.buscarTodos();
+    if (ano) {
+      return todos.filter((c) => Number(c.ano_execucao) === Number(ano));
+    }
+    return todos;
   },
 };
 
-// =============================================================================
-// SERVIÇOS DE CURSOS
-// =============================================================================
-export const cursosService = {
+export const programasService = {
   /**
-   * Lista todos os cursos disponíveis
-   * Conforme Manual: GET http://192.168.100.141:5000/cursos (opcional ?programa_id={id})
+   * Extrai os programas únicos a partir dos cursos retornados por /curso/busca
+   * Não efetua requisições a /programas ou /cursos
    */
-  async listar(programaId?: number): Promise<CursoPublico[]> {
-    try {
-      const params = programaId ? { programa_id: programaId } : {};
-      let response = await apiClient.get<any>('/cursos', { params }).catch(() => null);
+  async listar(): Promise<ProgramaPublico[]> {
+    const cursos = await cursosService.buscarTodos();
+    const mapa = new Map<number, ProgramaPublico>();
 
-      if (!response || !response.data) {
-        response = await apiClient
-          .post<any>('/curso/busca', {
-            ...(programaId ? { programa_id: programaId } : {}),
-            ano_execucao: 2026,
-          })
-          .catch(() => null);
+    cursos.forEach((c) => {
+      const pId = Number(c.programa_id || c.fk_programa);
+      const pNome = c.programa_nome;
+      if (pId && !mapa.has(pId)) {
+        mapa.set(pId, {
+          id: pId,
+          ID: pId,
+          nome: pNome || `Programa ${pId}`,
+          descricao: '',
+        });
       }
+    });
 
-      const data = response?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.cursos)) return data.cursos;
-      if (data && Array.isArray(data.data)) return data.data;
-      if (data && Array.isArray(data.rows)) return data.rows;
-      return [];
-    } catch (e) {
-      console.warn('[cursosService] Erro ao carregar cursos do servidor:', e);
-      return [];
-    }
-  },
-
-  /**
-   * Busca cursos pelo endpoint direto de busca com filtro de ano
-   */
-  async buscarPorAno(ano?: number): Promise<CursoPublico[]> {
-    try {
-      const response = await apiClient.post<any>('/curso/busca', { ano_execucao: ano || 2026 });
-      const data = response.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.cursos)) return data.cursos;
-      if (data && Array.isArray(data.data)) return data.data;
-      return [];
-    } catch (e) {
-      console.warn('[cursosService] Erro ao buscar cursos por ano:', e);
-      return [];
-    }
+    return Array.from(mapa.values()).sort((a, b) => a.id - b.id);
   },
 };
 

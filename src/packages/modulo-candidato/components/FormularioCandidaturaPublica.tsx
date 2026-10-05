@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Swal from 'sweetalert2';
 import {
   User,
@@ -14,7 +14,9 @@ import {
   Camera,
   FileText,
   ShieldCheck,
-  FileSpreadsheet, X, Image as ImageIcon,
+  FileSpreadsheet,
+  X,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { ProgramaPublico, CursoPublico, CandidaturaPublica } from '../types';
 import { candidatoApi } from '../services/candidatoApi';
@@ -36,6 +38,107 @@ interface FormularioCandidaturaPublicaProps {
   aoNotificar: (msg: { tipo: 'sucesso' | 'erro'; texto: string } | null) => void;
   aoIrParaConsulta: (codigoOuBi: string) => void;
 }
+
+interface CampoUploadDocumentoProps {
+  id?: string;
+  titulo: string;
+  subtitulo?: string;
+  ficheiro: File | null;
+  aoAlterar: (file: File | null) => void;
+  accept?: string;
+  obrigatorio?: boolean;
+  temErro?: boolean;
+}
+
+const CampoUploadDocumento: React.FC<CampoUploadDocumentoProps> = ({
+  id,
+  titulo,
+  subtitulo = 'PDF, JPG ou PNG (Clique em qualquer ponto do campo para procurar)',
+  ficheiro,
+  aoAlterar,
+  accept = '.pdf,image/jpeg,image/png,image/webp',
+  obrigatorio = false,
+  temErro = false,
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const formatarTamanho = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div
+      id={id}
+      onClick={() => inputRef.current?.click()}
+      className={`relative group rounded-xl p-4 transition-all cursor-pointer border-2 select-none flex flex-col justify-between min-h-[148px] ${
+        temErro
+          ? 'border-rose-500 bg-rose-50/90 text-rose-950 shadow-xs'
+          : ficheiro
+          ? 'border-emerald-500 bg-emerald-50/60 hover:bg-emerald-50 text-slate-800 shadow-2xs'
+          : 'border-dashed border-slate-300 hover:border-emerald-600 bg-slate-50/80 hover:bg-emerald-50/40 text-slate-700'
+      }`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            aoAlterar(e.target.files[0]);
+          }
+          e.target.value = '';
+        }}
+        className="hidden"
+      />
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-900 pointer-events-none">
+            {ficheiro ? (
+              <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+            ) : (
+              <Upload className="w-4 h-4 text-slate-500 group-hover:text-emerald-700 shrink-0 transition-colors" />
+            )}
+            <span>{titulo}</span>
+            {obrigatorio && <span className="text-rose-600">*</span>}
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500 leading-tight pointer-events-none">
+          {ficheiro ? 'Documento carregado com sucesso' : subtitulo}
+        </p>
+      </div>
+
+      {ficheiro ? (
+        <div className="mt-3 pt-2.5 border-t border-emerald-200/80 flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-emerald-950 truncate">{ficheiro.name}</p>
+            <p className="text-[10px] text-emerald-700 font-medium font-mono-tabular">
+              {formatarTamanho(ficheiro.size)} · {ficheiro.type.includes('pdf') ? 'Documento PDF' : 'Imagem'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              aoAlterar(null);
+            }}
+            className="p-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-800 transition-colors shadow-2xs shrink-0 cursor-pointer"
+            title="Remover documento"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-800 group-hover:text-emerald-950 transition-colors">
+          <Upload className="w-3.5 h-3.5" />
+          <span>Clique para procurar</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const OPCOES_HABILITACAO_LITERARIA = [
   '1.ª Classe',
@@ -137,18 +240,47 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
     }
   }, [cursoPreSelecionado]);
 
-  // Ao alterar o programa, ajusta curso_opcao1_id para o primeiro curso do programa e ZERA a opcao2!
+  // 1. Ao alterar o programa no select: filtra os cursos da 1.ª opção para esse programa
   const handleProgramaChange = (novoProgramaId: number) => {
-    const cursosDoPrograma = cursos.filter(
-      (c) => Number(c.fk_programa || c.programa_id) === Number(novoProgramaId)
+    setFormData((prev) => {
+      if (novoProgramaId > 0) {
+        // Verifica se o curso_opcao1_id atual pertence a este programa
+        const cursoAtualPertence = safeCursos.some(
+          (c) =>
+            Number(c.id || c.ID) === Number(prev.curso_opcao1_id) &&
+            Number(c.fk_programa || c.programa_id) === Number(novoProgramaId)
+        );
+        return {
+          ...prev,
+          programa_id: novoProgramaId,
+          curso_opcao1_id: cursoAtualPertence ? prev.curso_opcao1_id : 0,
+        };
+      }
+      return {
+        ...prev,
+        programa_id: 0,
+      };
+    });
+  };
+
+  // 2. Ao alterar o curso da 1.ª opção: seleciona automaticamente o programa correspondente
+  const handleCursoOpcao1Change = (novoCursoId: number) => {
+    const cursoEscolhido = safeCursos.find(
+      (c) => Number(c.id || c.ID) === Number(novoCursoId)
     );
-    const primeiroCurso = cursosDoPrograma[0];
-    setFormData((prev) => ({
-      ...prev,
-      programa_id: novoProgramaId,
-      curso_opcao1_id: primeiroCurso ? Number(primeiroCurso.id || primeiroCurso.ID) : 0,
-      curso_opcao2_id: 0, // Não autopreenche opção 2 (já que não é obrigatória)
-    }));
+    if (cursoEscolhido) {
+      const progIdDoCurso = Number(cursoEscolhido.fk_programa || cursoEscolhido.programa_id || 0);
+      setFormData((prev) => ({
+        ...prev,
+        curso_opcao1_id: novoCursoId,
+        programa_id: progIdDoCurso > 0 ? progIdDoCurso : prev.programa_id,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        curso_opcao1_id: 0,
+      }));
+    }
   };
 
   const handleFotoUpload = (file: File | null) => {
@@ -347,10 +479,14 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
   const safeProgramas = Array.isArray(programas) ? programas : [];
   const safeCursos = Array.isArray(cursos) ? cursos : [];
 
-  const cursosFiltrados = safeCursos.filter(
-    (c) => Number(c.fk_programa || c.programa_id) === Number(formData.programa_id)
-  );
-  const listaCursosExibida = cursosFiltrados.length > 0 ? cursosFiltrados : safeCursos;
+  // Se um programa estiver selecionado (programa_id > 0), filtra os cursos desse programa
+  // Caso contrário, disponibiliza todos os cursos para seleção direta
+  const cursosOpcao1Disponiveis =
+    Number(formData.programa_id) > 0
+      ? safeCursos.filter(
+          (c) => Number(c.fk_programa || c.programa_id) === Number(formData.programa_id)
+        )
+      : safeCursos;
 
   // Opções de Estado Civil ajustadas ao Sexo selecionado
   const opcoesEstadoCivil =
@@ -1133,7 +1269,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                   <span>Programa de Formação *</span>
                   <FieldTooltip
                     title="Programas Formativos"
-                    content="Selecione o programa de formação do CFP-STP."
+                    content="Selecione o programa de formação para filtrar os cursos, ou selecione diretamente o curso na 1.ª opção para autopreencher o programa."
                   />
                 </label>
                 <select
@@ -1143,7 +1279,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                   onChange={(e) => handleProgramaChange(Number(e.target.value))}
                   className={getInputStyle('programa_id', true)}
                 >
-                  <option value="">Selecione o programa de formação...</option>
+                  <option value="">Todos os Programas (ou escolha o curso ao lado)...</option>
                   {safeProgramas.map((p) => (
                     <option key={p.id || p.ID} value={p.id || p.ID}>
                       {p.nome}
@@ -1163,22 +1299,25 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                   <span>Curso — 1.ª Opção *</span>
                   <FieldTooltip
                     title="1.ª Opção Prioritária"
-                    content="O seu curso de maior preferência."
+                    content="Ao escolher o curso pretendido, o programa correspondente será selecionado automaticamente."
                   />
                 </label>
                 <select
                   id="campo-curso_opcao1_id"
                   required
                   value={formData.curso_opcao1_id || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, curso_opcao1_id: Number(e.target.value) })
-                  }
+                  onChange={(e) => handleCursoOpcao1Change(Number(e.target.value))}
                   className={getInputStyle('curso_opcao1_id', true)}
                 >
-                  <option value="">Selecione o curso (1.ª Opção)...</option>
-                  {listaCursosExibida.map((c) => (
+                  <option value="">
+                    {Number(formData.programa_id) > 0
+                      ? `Selecione um curso deste programa (${cursosOpcao1Disponiveis.length} disponíveis)...`
+                      : 'Selecione o curso (1.ª Opção)...'}
+                  </option>
+                  {cursosOpcao1Disponiveis.map((c) => (
                     <option key={c.id || c.ID} value={c.id || c.ID}>
-                      {c.nome} ({c.horario || `${c.duracao}h`} · {c.local_realizacao || 'CFP-STP'})
+                      {c.nome} {c.horario ? `(${c.horario} · ${c.local_realizacao || 'CFP-STP'})` : ''}{' '}
+                      {!formData.programa_id && c.programa_nome ? `— [${c.programa_nome}]` : ''}
                     </option>
                   ))}
                 </select>
@@ -1195,7 +1334,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                   <span>Curso — 2.ª Opção (Opcional)</span>
                   <FieldTooltip
                     title="2.ª Opção Alternativa"
-                    content="Curso alternativo opcional. Não se autoprenche automaticamente."
+                    content="Curso alternativo opcional. Não altera o programa da 1.ª opção nem se autopreenche."
                   />
                 </label>
                 <select
@@ -1259,7 +1398,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
               {/* Fotografia - OBRIGATÓRIA (Opção de Carregar do Dispositivo ou Tirar Foto) */}
               <div
                 id="campo-foto"
-                className={`border-2 rounded-xl p-4 space-y-3 transition-all ${
+                className={`border-2 rounded-xl p-4 space-y-3 transition-all min-h-[148px] flex flex-col justify-between ${
                   fieldHasError('foto')
                     ? 'border-rose-500 bg-rose-50/90 text-rose-950'
                     : 'border-emerald-300 bg-emerald-50/30'
@@ -1274,7 +1413,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                         content="Pode carregar uma foto guardada no seu dispositivo ou tirar uma nova foto com a câmara."
                       />
                     </label>
-                    <p className="text-[11px] text-slate-500">Impressa na Página 1 da Ficha PDF</p>
+                    <p className="text-[11px] text-slate-500">Impressa na Ficha Oficial PDF</p>
                   </div>
                   {fotoPreview && (
                     <div className="relative group shrink-0">
@@ -1303,7 +1442,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                   {/* Opção A: Carregar Foto do Dispositivo */}
                   <label className="w-full py-2 px-3 rounded-lg bg-white border border-slate-300 hover:border-emerald-600 text-slate-800 hover:text-emerald-950 text-xs font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
                     <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Carregar Foto do Dispositivo</span>
+                    <span>Carregar do Dispositivo</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1321,7 +1460,7 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                     className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs"
                   >
                     <Camera className="w-4 h-4 text-white shrink-0" />
-                    <span>Tirar Foto com a Câmara</span>
+                    <span>Tirar com a Câmara</span>
                   </button>
                 </div>
 
@@ -1340,50 +1479,30 @@ export const FormularioCandidaturaPublica: React.FC<FormularioCandidaturaPublica
                 )}
               </div>
 
-              {/* Documentos Opcionais */}
-              <div
+              {/* Documentos Opcionais (Com clique total no campo para procurar no dispositivo) */}
+              <CampoUploadDocumento
                 id="campo-bi-doc"
-                className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2 transition-all"
-              >
-                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                  <span>Cópia do BI / Documento (Opcional)</span>
-                </label>
-                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                <input
-                  type="file"
-                  accept=".pdf,image/*"
-                  onChange={(e) => setFileBi(e.target.files ? e.target.files[0] : null)}
-                  className="text-xs w-full text-slate-600"
-                />
-              </div>
+                titulo="Cópia do BI / Documento"
+                subtitulo="Clique no campo para escolher (PDF ou Imagem)"
+                ficheiro={fileBi}
+                aoAlterar={setFileBi}
+              />
 
-              <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
-                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                  <span>Cópia do NIF (Opcional)</span>
-                </label>
-                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                <input
-                  type="file"
-                  accept=".pdf,image/*"
-                  onChange={(e) => setFileNif(e.target.files ? e.target.files[0] : null)}
-                  className="text-xs w-full text-slate-600"
-                />
-              </div>
+              <CampoUploadDocumento
+                id="campo-nif-doc"
+                titulo="Cópia do NIF"
+                subtitulo="Clique no campo para escolher (PDF ou Imagem)"
+                ficheiro={fileNif}
+                aoAlterar={setFileNif}
+              />
 
-              <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 space-y-2">
-                <label className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                  <span>Certificado de Habilitações (Opcional)</span>
-                </label>
-                <p className="text-[11px] text-slate-500">Formato PDF, JPG ou PNG</p>
-                <input
-                  type="file"
-                  accept=".pdf,image/*"
-                  onChange={(e) =>
-                    setFileCertificado(e.target.files ? e.target.files[0] : null)
-                  }
-                  className="text-xs w-full text-slate-600"
-                />
-              </div>
+              <CampoUploadDocumento
+                id="campo-certificado-doc"
+                titulo="Certificado Habilitações"
+                subtitulo="Clique no campo para escolher (PDF ou Imagem)"
+                ficheiro={fileCertificado}
+                aoAlterar={setFileCertificado}
+              />
             </div>
           </div>
 

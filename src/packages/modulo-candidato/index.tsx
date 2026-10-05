@@ -30,13 +30,19 @@ export const ModuloCandidatoApp: React.FC<ModuloCandidatoAppProps> = ({
 
   useEffect(() => {
     candidatoApi
-      .listarProgramas()
-      .then((res) => setProgramas(Array.isArray(res) ? res : []))
-      .catch(() => setProgramas([]));
-    candidatoApi
       .listarCursos()
-      .then((res) => setCursos(Array.isArray(res) ? res : []))
-      .catch(() => setCursos([]));
+      .then((res) => {
+        const listaCursos = Array.isArray(res) ? res : [];
+        setCursos(listaCursos);
+        candidatoApi
+          .listarProgramas()
+          .then((pRes) => setProgramas(Array.isArray(pRes) ? pRes : []))
+          .catch(() => setProgramas([]));
+      })
+      .catch(() => {
+        setCursos([]);
+        setProgramas([]);
+      });
   }, []);
 
   const handleEscolherCursoDoCatalogo = (curso: CursoPublico) => {
