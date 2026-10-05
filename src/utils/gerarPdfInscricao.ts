@@ -431,13 +431,11 @@ export const gerarPdfFormularioInscricao = async (
 
   lx = drawLabel('Idade', lx + 30, y, 8.8);
   let idadeTexto = '';
-  if (dados.idade && !isNaN(Number(dados.idade)) && Number(dados.idade) > 0) {
+  const idCalc = dados.datanascimento ? calcularIdade(dados.datanascimento) : null;
+  if (idCalc !== null && idCalc >= 0) {
+    idadeTexto = `${idCalc} anos`;
+  } else if (dados.idade && !isNaN(Number(dados.idade)) && Number(dados.idade) > 0) {
     idadeTexto = `${dados.idade} anos`;
-  } else if (dados.datanascimento) {
-    const idCalc = calcularIdade(dados.datanascimento);
-    if (idCalc !== null && idCalc >= 0) {
-      idadeTexto = `${idCalc} anos`;
-    }
   }
   drawUnderlinedValue(lx, rightEdge, y + 0.3, idadeTexto);
 

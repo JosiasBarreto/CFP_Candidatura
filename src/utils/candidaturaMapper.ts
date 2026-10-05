@@ -18,10 +18,10 @@ export function converterCandidaturaParaDadosFicha(
   const dataNascimento = cand.data_nascimento || '';
   const idadeCalculada = dataNascimento ? calcularIdade(dataNascimento) : null;
   const idadeFinal =
-    cand.idade && Number(cand.idade) > 0
-      ? String(cand.idade)
-      : idadeCalculada !== null && idadeCalculada >= 0
+    idadeCalculada !== null && idadeCalculada >= 0
       ? String(idadeCalculada)
+      : cand.idade && Number(cand.idade) > 0
+      ? String(cand.idade)
       : '';
 
   return {
